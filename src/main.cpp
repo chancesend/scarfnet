@@ -125,6 +125,7 @@ void loop() {
         leds_real[1] = blinkState ? CRGB::Red : CRGB::Black;
         leds_real[2] = blinkState ? CRGB::Red : CRGB::Black;
         blinkState = !blinkState;
+        Serial.printf("LED state changed");
     }
 }
 
