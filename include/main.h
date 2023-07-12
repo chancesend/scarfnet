@@ -7,5 +7,3 @@
 //#include <M5Atom.h>
 
 void showLEDs();
-void fillNoise();
-void fillNoise8();
