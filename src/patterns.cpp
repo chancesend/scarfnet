@@ -2,7 +2,6 @@
 #include "defines.h"
 
 #include <stdint.h>
-#include <FastLED.h>
 
 static int16_t dist;  // A random number for our noise generator.
 uint16_t xscale = 30;  // Wouldn't recommend changing this on the fly, or the animation will be really blocky.

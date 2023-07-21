@@ -74,9 +74,14 @@ void init_mesh() {
     mesh.onNodeDelayReceived(&delayReceivedCallback);
 }
 
+Scarf::Scarf()
+{
+    
+}
+
 void Scarf::setup()
 {
-        // put your setup code here, to run once:
+    // put your setup code here, to run once:
     #if 0
     M5.begin(
         true,  // SerialEnable
@@ -106,7 +111,7 @@ void Scarf::setup()
     taskSendMessage.enable();
     taskCheckButtonPress.enable() ;
 
-    blinkNoNodes.set(kBlinkPeriod, (mesh.getNodeList().size() + 1) * 2, &blinkNumNodes);
+    blinkNoNodes.set(kBlinkPeriod, getNumNodes() * 2, &blinkNumNodes);
     userScheduler.addTask(blinkNoNodes);
     blinkNoNodes.enable();
 
@@ -122,19 +127,22 @@ void Scarf::loop()
     mesh.update();
 
     EVERY_N_MILLISECONDS(15) {
+        updateTime();
         showLEDs();
-    }
-
-    EVERY_N_MILLISECONDS(15) {
         showBuiltInLED();
     }
+}
+
+void Scarf::updateTime()
+{
+    _timeUsec = mesh.getNodeTime();
 }
 
 void Scarf::showBuiltInLED() {
     auto color = !onFlag ? CRGB::White : CRGB::Black;
     for (int i = 0; i < builtin_led.size(); ++i)
     {
-    builtin_led[i] = !color;
+        builtin_led[i] = !color;
     }
 }
 
@@ -146,6 +154,18 @@ void Scarf::showLEDs() {
 
     for (int i = 0; i < leds.size(); i++) {
         leds_real[i] = leds[i];
+    }
+
+    if ((_timeUsec / _usecPeriod) > _timeSec)
+    {
+        // We know that our mesh is at the start of our period,
+        // so flash the number of LEDs to correspond to the number
+        // of nodes we have
+        int numLeds = 1;//getNumNodes();
+        for (int i = 0; i < numLeds; i++) {
+            leds_real[i].setRGB(100, 100, 100);
+        }
+        _timeSec = (_timeUsec / _usecPeriod);
     }
 
     FastLED.show();
@@ -190,12 +210,17 @@ void blinkNumNodes() {
     if (blinkNoNodes.isLastIteration()) {
         // Finished blinking. Reset task for next run 
         // blink number of nodes (including this node) times
-        blinkNoNodes.setIterations((mesh.getNodeList().size() + 1) * 2);
+        blinkNoNodes.setIterations(getNumNodes() * 2);
         // Calculate delay based on current mesh time and kBlinkPeriod
         // This results in blinks between nodes being synced
         blinkNoNodes.enableDelayed(kBlinkPeriod - 
             (mesh.getNodeTime() % (kBlinkPeriod*1000))/1000);
     }
+}
+
+int getNumNodes()
+{
+    return (mesh.getNodeList().size() + 1);
 }
 
 
@@ -206,7 +231,7 @@ void receivedCallback(uint32_t from, String & msg) {
 void newConnectionCallback(uint32_t nodeId) {
     // Reset blink task
     onFlag = false;
-    blinkNoNodes.setIterations((mesh.getNodeList().size() + 1) * 2);
+    blinkNoNodes.setIterations(getNumNodes() * 2);
     blinkNoNodes.enableDelayed(kBlinkPeriod - (mesh.getNodeTime() % (kBlinkPeriod*1000))/1000);
     
     Serial.printf("--> startHere: New Connection, nodeId = %u, %s\n", nodeId, mesh.subConnectionJson(true).c_str());
@@ -217,7 +242,6 @@ void print_connection_list(const NodeList& nodes) {
 
     for (NodeList::const_iterator node = nodes.begin(); node != nodes.end(); node++) {
         Serial.printf(" %u", *node);
-        node++;
     }
     Serial.println();
 }
@@ -226,7 +250,7 @@ void changedConnectionCallback() {
     Serial.printf("Changed connections\n");
     // Reset blink task
     onFlag = false;
-    blinkNoNodes.setIterations((mesh.getNodeList().size() + 1) * 2);
+    blinkNoNodes.setIterations(getNumNodes() * 2);
     blinkNoNodes.enableDelayed(kBlinkPeriod - (mesh.getNodeTime() % (kBlinkPeriod*1000))/1000);
     
     NodeList nodes = mesh.getNodeList();

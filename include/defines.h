@@ -1,6 +1,8 @@
 #pragma once
 
+#define FASTLED_INTERNAL (1)
 #include <FastLED.h>
+
 #include <string>
 #include <vector>
 
