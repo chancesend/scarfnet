@@ -1,16 +1,18 @@
 #pragma once
 
 #include <FastLED.h>
+#include <string>
 #include <vector>
 
-#define   MESH_SSID       "whateverYouLike"
-#define   MESH_PASSWORD   "somethingSneaky"
-#define   MESH_PORT       5555
+const std::string kMeshSSID = "scarfNet";
+const std::string kMeshPassword = "aNetOfScarves";
+const uint16_t kMeshPort = 5555;
 
-#define LED_PIN     26 // This pin is ignorred when using FASTLED_ESP8266_DMA
-#define NUM_LEDS    25
-#define BRIGHTNESS  100 // Range 0 - 255
+const int kLedPin = 26; // This pin is ignorred when using FASTLED_ESP8266_DMA
+const int kNumLeds= 25;
+const int kBrightness = 100; // Range 0 - 255
+
 #define LED_TYPE    NEOPIXEL
-#define COLOR_ORDER GRB
+const EOrder kColorOrder = GRB;
 
 typedef std::vector<CRGB> led_list;

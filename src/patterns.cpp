@@ -32,7 +32,7 @@ void pride(led_list& leds)
   sHue16 += deltams * beatsin88( 400, 5,9);
   uint16_t brightnesstheta16 = sPseudotime;
   
-  for( uint16_t i = 0 ; i < NUM_LEDS; i++) {
+  for( uint16_t i = 0 ; i < kNumLeds; i++) {
     hue16 += hueinc16;
     uint8_t hue8 = hue16 / 256;
 
@@ -46,7 +46,7 @@ void pride(led_list& leds)
     CRGB newcolor = CHSV( hue8, sat8, bri8);
     
     uint16_t pixelnumber = i;
-    pixelnumber = (NUM_LEDS-1) - pixelnumber;
+    pixelnumber = (kNumLeds - 1) - pixelnumber;
     
     nblend( leds[pixelnumber], newcolor, 64);
   }
@@ -54,13 +54,13 @@ void pride(led_list& leds)
 
 void fillnoise8(led_list& leds, int32_t time) {
   // Just ONE loop to fill up the LED array as all of the pixels change.
-  for(int i = 0; i < NUM_LEDS; i++) {
+  for(int i = 0; i < kNumLeds; i++) {
     // Get a value from the noise function. I'm using both x and y axis.
-    uint8_t index = inoise8(0, dist+i* yscale) % 255;
+    uint8_t index = inoise8(0, dist + i * yscale) % 255;
     // With that value, look up the 8 bit colour palette value and assign it to the current LED.
     leds[i] = ColorFromPalette(currentPalette, index, 255, LINEARBLEND);
   }
-    dist += beatsin8(10,1,4, time);                        
+    dist += beatsin8(10, 1, 4, time);                        
 }
 
 void fillNoise(led_list& leds, int32_t time) {
