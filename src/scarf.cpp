@@ -1,4 +1,4 @@
-#include "scarf.h"
+#include "Scarf.h"
 
 #include "defines.h"
 #include "patterns.h"
@@ -6,77 +6,43 @@
 #include <Arduino.h>
 
 const int kBuiltinLedPin = 27; // GPIO number of builtin LED
-const int kNumBuiltinLeds = 1;
-
-const int kBlinkPeriod = 3000; // milliseconds until cycle repeat
-
-const int kButtonPin = 39;
-Button nextPatternButton(kButtonPin, 0, 10);
-
-led_list leds;
-led_list leds_real;
-
-led_list builtin_led;
-
-
-// Prototypes
-void sendMessage(); 
-void receivedCallback(uint32_t from, String & msg);
-void newConnectionCallback(uint32_t nodeId);
-void changedConnectionCallback(); 
-void nodeTimeAdjustedCallback(int32_t offset); 
-void delayReceivedCallback(uint32_t from, int32_t delay);
-
-
-Scheduler     userScheduler; // to control your personal task
-painlessMesh  mesh;
-
-enum ButtonState
-{
-    kButtonState_Up,
-    kButtonState_Pressed,
-    kButtonState_LongPressed,
-    kButtonState_DoublePressed
-};
-
-ButtonState buttonState = kButtonState_Up;
-int32_t lastSelfButtonPress = 0;
-
-bool calc_delay = false;
-typedef SimpleList<uint32_t> NodeList;
-NodeList nodes;
-
-void checkButtonPress();
-void sendMessage();
-void currentPatternRun();
-void blinkNumNodes();
-
-void showBuiltInLED();
 
 #define TASK_CHECK_BUTTON_PRESS_INTERVAL    50   // in milliseconds
 #define CURRENTPATTERN_SELECT_DEFAULT_INTERVAL     1   // default scheduling time for currentPatternSELECT, in milliseconds
 
-Task taskCheckButtonPress( TASK_CHECK_BUTTON_PRESS_INTERVAL, TASK_FOREVER, &checkButtonPress);
-Task taskCurrentPatternRun( CURRENTPATTERN_SELECT_DEFAULT_INTERVAL, TASK_FOREVER, &currentPatternRun);
-Task taskSendMessage( TASK_SECOND * 1, TASK_FOREVER, &sendMessage ); // start with a one second interval
 
-// Task to blink the number of nodes
-Task blinkNoNodes;
-bool onFlag = false;
-
-void init_mesh() {
-    mesh.setDebugMsgTypes( ERROR | STARTUP | CONNECTION | SYNC );  // set before init() so that you can see error messages
-    mesh.init(kMeshSSID.c_str(), kMeshPassword.c_str(), &userScheduler, kMeshPort);
-    mesh.onReceive(&receivedCallback);
-    mesh.onNewConnection(&newConnectionCallback);
-    mesh.onChangedConnections(&changedConnectionCallback);
-    mesh.onNodeTimeAdjusted(&nodeTimeAdjustedCallback);
-    mesh.onNodeDelayReceived(&delayReceivedCallback);
+Scarf::Scarf() :
+    _nextPatternButton(kButtonPin, 0, 10),
+    _mesh(kMeshSSID, kMeshPassword, &_userScheduler, kMeshPort),
+    _taskCheckButtonPress( TASK_CHECK_BUTTON_PRESS_INTERVAL, TASK_FOREVER, 
+        [&](){ _button->checkButtonPress(); }),
+    _taskCurrentPatternRun( CURRENTPATTERN_SELECT_DEFAULT_INTERVAL, TASK_FOREVER, 
+        [&](){ this->currentPatternRun(); }),
+    _taskSendMessage( TASK_SECOND * 1, TASK_FOREVER, 
+        [&](){ this->sendMessage(); }) // start with a one second interval
+{
+    _mesh.addConnectionObserver(this);
 }
 
-Scarf::Scarf()
-{
+void Scarf::sendMessage() {
+    String msg = "ID: ";
+    msg += _mesh.getNodeId();
+    msg += ", last_press = ";
+    msg += lastSelfButtonPress;
+//  msg += " myFreeMemory: " + String(ESP.getFreeHeap());
+    _mesh.sendBroadcast(msg);
+
+    _mesh.doDelayCalc();
+
+    Serial.printf("Sending message: %s\n", msg.c_str());
     
+    _taskSendMessage.setInterval( random(TASK_SECOND * 1, TASK_SECOND * 5));  // between 1 and 5 seconds
+}
+
+void Scarf::onConnectionChange()
+{
+    _blinkNoNodes.setIterations(_mesh.getNumNodes() * 2);
+    _blinkNoNodes.enableDelayed(kBlinkPeriod - (_mesh.getNodeTime() % (kBlinkPeriod*1000))/1000);
 }
 
 void Scarf::setup()
@@ -93,27 +59,26 @@ void Scarf::setup()
     Serial.begin(115200);
     Serial.printf("Hello world!");
 
-    init_mesh();
-
-    leds.resize(kNumLeds);
-    leds_real.resize(kNumLeds);
-    FastLED.addLeds<LED_TYPE, kLedPin>(leds_real.data(), leds_real.size());
+    _leds.resize(kNumLeds);
+    _ledsReal.resize(kNumLeds);
+    FastLED.addLeds<LED_TYPE, kLedPin>(_ledsReal.data(), _ledsReal.size());
 
     // tell FastLED there's 1 builtin led
-    builtin_led.resize(kNumBuiltinLeds);
-    FastLED.addLeds<LED_TYPE, kBuiltinLedPin>(builtin_led.data(), builtin_led.size());
+    _builtinLED.resize(kNumBuiltinLeds);
+    FastLED.addLeds<LED_TYPE, kBuiltinLedPin>(_builtinLED.data(), _builtinLED.size());
 
     set_max_power_in_volts_and_milliamps(5, 500);               // FastLED Power management set at 5V, 500mA.
   
-    userScheduler.addTask( taskSendMessage );
-    userScheduler.addTask( taskCheckButtonPress );
-    userScheduler.addTask( taskCurrentPatternRun );
-    taskSendMessage.enable();
-    taskCheckButtonPress.enable() ;
+    _userScheduler.addTask( _taskSendMessage );
+    _userScheduler.addTask( _taskCheckButtonPress );
+    _userScheduler.addTask( _taskCurrentPatternRun );
+    _taskSendMessage.enable();
+    _taskCheckButtonPress.enable() ;
 
-    blinkNoNodes.set(kBlinkPeriod, getNumNodes() * 2, &blinkNumNodes);
-    userScheduler.addTask(blinkNoNodes);
-    blinkNoNodes.enable();
+    _blinkNoNodes.set(kBlinkPeriod, _mesh.getNumNodes() * 2, 
+        [&](){ this->blinkNumNodes(); });
+    _userScheduler.addTask(_blinkNoNodes);
+    _blinkNoNodes.enable();
 
 //    nextPatternButton.begin();
 
@@ -124,7 +89,7 @@ void Scarf::loop()
 {
     // put your main code here, to run repeatedly:
 //  M5.update();
-    mesh.update();
+    _mesh.update();
 
     EVERY_N_MILLISECONDS(15) {
         updateTime();
@@ -135,25 +100,25 @@ void Scarf::loop()
 
 void Scarf::updateTime()
 {
-    _timeUsec = mesh.getNodeTime();
+    _timeUsec = _mesh.getNodeTime();
 }
 
 void Scarf::showBuiltInLED() {
-    auto color = !onFlag ? CRGB::White : CRGB::Black;
-    for (int i = 0; i < builtin_led.size(); ++i)
+    auto color = !_onFlag ? CRGB::White : CRGB::Black;
+    for (int i = 0; i < _builtinLED.size(); ++i)
     {
-        builtin_led[i] = !color;
+        _builtinLED[i] = !color;
     }
 }
 
 // Generate the animation every (ms)
 void Scarf::showLEDs() {
     int timeOnAnimation = 20.0;
-    pride(leds);
+    pride(_leds);
 //    fillNoise(mesh.getNodeTime());
 
-    for (int i = 0; i < leds.size(); i++) {
-        leds_real[i] = leds[i];
+    for (int i = 0; i < _leds.size(); i++) {
+        _ledsReal[i] = _leds[i];
     }
 
     if ((_timeUsec / _usecPeriod) > _timeSec)
@@ -161,9 +126,9 @@ void Scarf::showLEDs() {
         // We know that our mesh is at the start of our period,
         // so flash the number of LEDs to correspond to the number
         // of nodes we have
-        int numLeds = 1;//getNumNodes();
+        int numLeds = _mesh.getNumNodes();
         for (int i = 0; i < numLeds; i++) {
-            leds_real[i].setRGB(100, 100, 100);
+            _ledsReal[i].setRGB(100, 100, 100);
         }
         _timeSec = (_timeUsec / _usecPeriod);
     }
@@ -174,121 +139,48 @@ void Scarf::showLEDs() {
 
 bool blinkState = false;
 
-void delay_calc(const NodeList& nodes) {
-    if (calc_delay) {
-        for (NodeList::const_iterator node = nodes.begin(); node != nodes.end(); ++node) {
-            mesh.startDelayMeas(*node);
-        }
-        calc_delay = false;
-    }
-}
-
-void sendMessage() {
-    String msg = "ID: ";
-    msg += mesh.getNodeId();
-    msg += ", last_press = ";
-    msg += lastSelfButtonPress;
-//  msg += " myFreeMemory: " + String(ESP.getFreeHeap());
-    mesh.sendBroadcast(msg);
-
-    delay_calc(nodes);
-
-    Serial.printf("Sending message: %s\n", msg.c_str());
-    
-    taskSendMessage.setInterval( random(TASK_SECOND * 1, TASK_SECOND * 5));  // between 1 and 5 seconds
-}
-
-void blinkNumNodes() {
+void Scarf::blinkNumNodes() {
     const int kBlinkDuration = 100;  // milliseconds LED is on for
     // If on, switch off, else switch on
-    if (onFlag)
-        onFlag = false;
+    if (_onFlag)
+        _onFlag = false;
     else
-        onFlag = true;
-    blinkNoNodes.delay(kBlinkDuration);
+        _onFlag = true;
+    _blinkNoNodes.delay(kBlinkDuration);
 
-    if (blinkNoNodes.isLastIteration()) {
+    if (_blinkNoNodes.isLastIteration()) {
         // Finished blinking. Reset task for next run 
         // blink number of nodes (including this node) times
-        blinkNoNodes.setIterations(getNumNodes() * 2);
+        _blinkNoNodes.setIterations(_mesh.getNumNodes() * 2);
         // Calculate delay based on current mesh time and kBlinkPeriod
         // This results in blinks between nodes being synced
-        blinkNoNodes.enableDelayed(kBlinkPeriod - 
-            (mesh.getNodeTime() % (kBlinkPeriod*1000))/1000);
+        _blinkNoNodes.enableDelayed(kBlinkPeriod - 
+            (_mesh.getNodeTime() % (kBlinkPeriod*1000))/1000);
     }
 }
 
-int getNumNodes()
-{
-    return (mesh.getNodeList().size() + 1);
-}
-
-
-void receivedCallback(uint32_t from, String & msg) {
-    Serial.printf("startHere: Received from %u msg=%s\n", from, msg.c_str());
-}
-
-void newConnectionCallback(uint32_t nodeId) {
-    // Reset blink task
-    onFlag = false;
-    blinkNoNodes.setIterations(getNumNodes() * 2);
-    blinkNoNodes.enableDelayed(kBlinkPeriod - (mesh.getNodeTime() % (kBlinkPeriod*1000))/1000);
-    
-    Serial.printf("--> startHere: New Connection, nodeId = %u, %s\n", nodeId, mesh.subConnectionJson(true).c_str());
-}
-
-void print_connection_list(const NodeList& nodes) {
-    Serial.printf("Connection list (%d nodes):", nodes.size());
-
-    for (NodeList::const_iterator node = nodes.begin(); node != nodes.end(); node++) {
-        Serial.printf(" %u", *node);
-    }
-    Serial.println();
-}
-
-void changedConnectionCallback() {
-    Serial.printf("Changed connections\n");
-    // Reset blink task
-    onFlag = false;
-    blinkNoNodes.setIterations(getNumNodes() * 2);
-    blinkNoNodes.enableDelayed(kBlinkPeriod - (mesh.getNodeTime() % (kBlinkPeriod*1000))/1000);
-    
-    NodeList nodes = mesh.getNodeList();
-
-    print_connection_list(nodes);
-    calc_delay = true;
-}
-
-void nodeTimeAdjustedCallback(int32_t offset) {
-    Serial.printf("Adjusted time %u. Offset = %d\n", mesh.getNodeTime(), offset);
-}
-
-void delayReceivedCallback(uint32_t from, int32_t delay) {
-    Serial.printf("Delay to node %u is %d us\n", from, delay);
-}
-
-void checkButtonPress()
+void Scarf::checkButtonPress()
 {
     const int32_t kLongPressTimeMs = 1000;
-    nextPatternButton.read();
-    if (nextPatternButton.pressedFor(kLongPressTimeMs) && nextPatternButton.isPressed() && buttonState != kButtonState_LongPressed)
+    _nextPatternButton.read();
+    if (_nextPatternButton.pressedFor(kLongPressTimeMs) && _nextPatternButton.isPressed() && buttonState != kButtonState_LongPressed)
     {
         buttonState = kButtonState_LongPressed;
         Serial.printf("Long press!\n");
     }
-    else if( nextPatternButton.wasPressed() ) {
+    else if( _nextPatternButton.wasPressed() ) {
         buttonState = kButtonState_Pressed;
         Serial.printf("Button press!\n");
         //selectNextPattern();
-        lastSelfButtonPress = mesh.getNodeTime();
+        lastSelfButtonPress = _mesh.getNodeTime();
     }
-    else if (nextPatternButton.wasReleased())
+    else if (_nextPatternButton.wasReleased())
     {
         buttonState = kButtonState_Up;
     }
 }
 
-void currentPatternRun()
+void Scarf::currentPatternRun()
 {
 
 }
