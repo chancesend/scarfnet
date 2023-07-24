@@ -9,8 +9,16 @@
 #include <M5Stack.h>
 #include <FastLED.h>
 
+#include <memory>
+
 namespace Scarf
 {
+
+template<typename T, typename... Args>
+std::unique_ptr<T> make_unique(Args&&... args)
+{
+    return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
+}
 
 class Scarf
 {
@@ -62,7 +70,7 @@ private:
     led_list        _builtinLED;
     Scheduler       _userScheduler; // to control your personal task
     
-    Mesh            _mesh;
+    std::unique_ptr<Mesh>   _mesh;
 };
 
 }

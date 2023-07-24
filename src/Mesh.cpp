@@ -5,12 +5,12 @@ namespace Scarf
 
 Mesh::Mesh(std::string ssid, std::string password, Scheduler* scheduler, uint16_t port) {
     _mesh.setDebugMsgTypes( ERROR | STARTUP | CONNECTION | SYNC );  // set before init() so that you can see error messages
-//    _mesh.init(ssid.c_str(), password.c_str(), scheduler, port);
-//    _mesh.onReceive([&](uint32_t from, TSTRING &msg){ this->receivedCallback(from, msg); });
-//    _mesh.onNewConnection([&](uint32_t nodeId){ this->newConnectionCallback(nodeId); });
-//    _mesh.onChangedConnections([&](){ this->changedConnectionCallback(); });
-//    _mesh.onNodeTimeAdjusted([&](int32_t offset){ this->nodeTimeAdjustedCallback(offset); });
-//    _mesh.onNodeDelayReceived([&](uint32_t nodeId, int32_t delay){ this->delayReceivedCallback(nodeId, delay); });
+    _mesh.init(ssid.c_str(), password.c_str(), scheduler, port);
+    _mesh.onReceive([&](uint32_t from, TSTRING &msg){ this->receivedCallback(from, msg); });
+    _mesh.onNewConnection([&](uint32_t nodeId){ this->newConnectionCallback(nodeId); });
+    _mesh.onChangedConnections([&](){ this->changedConnectionCallback(); });
+    _mesh.onNodeTimeAdjusted([&](int32_t offset){ this->nodeTimeAdjustedCallback(offset); });
+    _mesh.onNodeDelayReceived([&](uint32_t nodeId, int32_t delay){ this->delayReceivedCallback(nodeId, delay); });
 }
 
 void Mesh::delayCalc(const NodeList& nodes) {

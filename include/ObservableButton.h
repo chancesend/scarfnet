@@ -45,16 +45,19 @@ public:
             observer(event);
         }
     }
+    
+    void setup();
 
 private:
-    void checkButtonPress();
+    void checkButtonEvent();
 
-    Task _taskCheckButtonPress;
+    Task _taskCheckButtonEvent;
     ButtonState buttonState = kButtonState_Up;
     Button _button;
 
     typedef std::vector<EventCallback_t> MyObserverList;
     MyObserverList _observers;
+    Scheduler* _scheduler;
 };
 
 };

@@ -14,31 +14,22 @@ const int kBuiltinLedPin = 27; // GPIO number of builtin LED
 
 Scarf::Scarf() :
     _nextPatternButton(&_userScheduler, kButtonPin),
-    _mesh(kMeshSSID, kMeshPassword, &_userScheduler, kMeshPort),
     _taskCurrentPatternRun( CURRENTPATTERN_SELECT_DEFAULT_INTERVAL, TASK_FOREVER, 
         [&](){ this->currentPatternRun(); }),
     _taskSendMessage( TASK_SECOND * 1, TASK_FOREVER, 
         [&](){ this->sendMessage(); }) // start with a one second interval
 {
     Serial.printf("Scarf::Scarf()\n");
-    _mesh.addConnectionObserver([&](){
-        this->onConnectionChange();
-    });
-    _nextPatternButton.addObserver([&](const ObservableButton::Event& event){
-        if (event == ObservableButton::Event::ePress) {
-//            lastSelfButtonPress = this->_mesh.getNodeTime();
-        }
-    });
 }
 
 void Scarf::sendMessage() {
     String msg = "ID: ";
-    msg += //.getNodeId();
+    msg += _mesh->getNodeId();
     msg += ", last_press = ";
     msg += lastSelfButtonPress;
-//    _mesh.sendBroadcast(msg);
+    _mesh->sendBroadcast(msg);
 
-//    _mesh.doDelayCalc();
+    _mesh->doDelayCalc();
 
     Serial.printf("Sending message: %s\n", msg.c_str());
     
@@ -48,8 +39,8 @@ void Scarf::sendMessage() {
 void Scarf::onConnectionChange()
 {
     Serial.printf("Scarf::onConnectionChange()\n");
-//    _blinkNoNodes.setIterations(_mesh.getNumNodes() * 2);
-//    _blinkNoNodes.enableDelayed(kBlinkPeriod - (_mesh.getNodeTime() % (kBlinkPeriod*1000))/1000);
+    _blinkNoNodes.setIterations(_mesh->getNumNodes() * 2);
+    _blinkNoNodes.enableDelayed(kBlinkPeriod - (_mesh->getNodeTime() % (kBlinkPeriod*1000))/1000);
 }
 
 void Scarf::setup()
@@ -67,6 +58,18 @@ void Scarf::setup()
 
     Serial.begin(115200);
     Serial.printf("Hello world!\n");
+    
+    _mesh = make_unique<Mesh>(kMeshSSID, kMeshPassword, &_userScheduler, kMeshPort);
+    _mesh->addConnectionObserver([&](){
+        this->onConnectionChange();
+    });
+
+    _nextPatternButton.setup();
+    _nextPatternButton.addObserver([&](const ObservableButton::Event& event){
+        if (event == ObservableButton::Event::ePress) {
+            lastSelfButtonPress = this->_mesh->getNodeTime();
+        }
+    });
 
     _leds.resize(kNumLeds);
     _ledsReal.resize(kNumLeds);
@@ -85,7 +88,7 @@ void Scarf::setup()
     // TODO: enable this task?  
     // _taskCurrrentPatternRun.enable();
 
-//    _blinkNoNodes.set(kBlinkPeriod, _mesh.getNumNodes() * 2, 
+//    _blinkNoNodes.set(kBlinkPeriod, _mesh->getNumNodes() * 2, 
 //        [&](){ this->blinkNumNodes(); });
     _userScheduler.addTask(_blinkNoNodes);
     _blinkNoNodes.enable();
@@ -100,7 +103,7 @@ void Scarf::loop()
     // put your main code here, to run repeatedly:
 
 //  M5.update();
-//    _mesh.update();
+    _mesh->update();
 
     EVERY_N_MILLISECONDS(15) {
         updateTime();
@@ -119,7 +122,7 @@ void Scarf::watchdog()
 
 void Scarf::updateTime()
 {
-//    _timeUsec = _mesh.getNodeTime();
+    _timeUsec = _mesh->getNodeTime();
 }
 
 void Scarf::showBuiltInLED() {
@@ -145,7 +148,7 @@ void Scarf::showLEDs() {
         // We know that our mesh is at the start of our period,
         // so flash the number of LEDs to correspond to the number
         // of nodes we have
-        int numLeds = 1;//_mesh.getNumNodes();
+        int numLeds = 1;//_mesh->getNumNodes();
         for (int i = 0; i < numLeds; i++) {
             _ledsReal[i].setRGB(100, 100, 100);
         }
@@ -170,11 +173,11 @@ void Scarf::blinkNumNodes() {
     if (_blinkNoNodes.isLastIteration()) {
         // Finished blinking. Reset task for next run 
         // blink number of nodes (including this node) times
-    //    _blinkNoNodes.setIterations(_mesh.getNumNodes() * 2);
+    //    _blinkNoNodes.setIterations(_mesh->getNumNodes() * 2);
         // Calculate delay based on current mesh time and kBlinkPeriod
         // This results in blinks between nodes being synced
     //    _blinkNoNodes.enableDelayed(kBlinkPeriod - 
-    //        (_mesh.getNodeTime() % (kBlinkPeriod*1000))/1000);
+    //        (_mesh->getNodeTime() % (kBlinkPeriod*1000))/1000);
     }
 }
 
