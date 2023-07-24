@@ -2,41 +2,16 @@
 
 #include <painlessMesh.h>
 
-#include <list>
+#include <vector>
+
+namespace Scarf
+{
 
 class Mesh
 {
 public:
-    class ConnectionObserver
-    {
-    public:
-        virtual void onConnectionChange() = 0;
-    };
-
-    class ConnectionObserverList
-    {
-    public:
-        typedef std::list<ConnectionObserver*> ObserverList;
-        void addConnectionObserver(ConnectionObserver* observer)
-        {
-            _list.push_back(observer);
-        }
-        void removeConnectionObserver(ConnectionObserver* observer)
-        {
-            _list.remove(observer);
-        }
-        
-        void onConnectionChange()
-        {
-            for(const auto& observer: _list)
-            {
-                observer->onConnectionChange();
-            }
-        }
-    private:
-        ObserverList _list;
-    };
-
+    typedef std::function<void()> ConnectionCallback_t;
+    
     Mesh(std::string ssid, std::string password, Scheduler* scheduler, uint16_t port);
 
     void update() { return _mesh.update(); };
@@ -64,23 +39,30 @@ public:
     void nodeTimeAdjustedCallback(int32_t offset); 
     void delayReceivedCallback(uint32_t from, int32_t delay);
 
-    void addConnectionObserver(ConnectionObserver* observer)
+    void addConnectionObserver(const ConnectionCallback_t& observer)
     {
-        _observers.addConnectionObserver(observer);
+        _observers.push_back(observer);
     }
-    void removeConnectionObserver(ConnectionObserver* observer)
+    void onConnectionChange()
     {
-        _observers.removeConnectionObserver(observer);
+        for(const auto& observer: _observers)
+        {
+            observer();
+        }
     }
+
 private:
     typedef SimpleList<uint32_t> NodeList;
     NodeList _nodes;
-
-    ConnectionObserverList  _observers;
 
     void delayCalc(const NodeList& nodes);
     void printConnectionList(const NodeList& nodes);
 
     bool _calcDelay {false};
     painlessMesh    _mesh;
+    
+    typedef std::vector<ConnectionCallback_t> ObserverList;
+    ObserverList _observers;
 };
+
+}

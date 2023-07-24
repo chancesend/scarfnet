@@ -1,30 +1,18 @@
 #pragma once
 
 #include "Mesh.h"
+#include "ObservableButton.h"
+
 #include "defines.h"
 
 #include <Arduino.h>
 #include <M5Stack.h>
 #include <FastLED.h>
 
-class Button
+namespace Scarf
 {
-public:
-    enum ButtonState
-    {
-        kButtonState_Up,
-        kButtonState_Pressed,
-        kButtonState_LongPressed,
-        kButtonState_DoublePressed
-    };
 
-    Button();
-private:
-    ButtonState buttonState = kButtonState_Up;
-    int32_t lastSelfButtonPress = 0;
-}
-
-class Scarf : public Mesh::ConnectionObserver
+class Scarf
 {
 public:
     Scarf();
@@ -33,9 +21,6 @@ public:
     void loop();
 
     void showLEDs();
-
-    // Mesh::ConnectionObserver overrides
-    void onConnectionChange() override;
 
 private:
     const int kNumBuiltinLeds = 1;
@@ -46,27 +31,26 @@ private:
 
     // Prototypes
 
-    Button _button;
-
     void showBuiltInLED();
-    void        updateTime();
-    void        initMesh();
+    void updateTime();
+    void initMesh();
+    void watchdog();
     
-    int         getNumNodes();
+    int  getNumNodes();
 
-    void checkButtonPress();
     void sendMessage();
     void currentPatternRun();
     void blinkNumNodes();
+    void onConnectionChange();
 
     uint32_t    _timeUsec {0};
     uint32_t    _timeSec{0};
     uint32_t    _usecPeriod{1000000};
     
-    Button      _nextPatternButton;
+    ObservableButton      _nextPatternButton;
+    int32_t lastSelfButtonPress = 0;
     bool        _onFlag {false};
     
-    Task _taskCheckButtonPress;
     Task _taskCurrentPatternRun;
     Task _taskSendMessage; // start with a one second interval
     // Task to blink the number of nodes
@@ -81,3 +65,4 @@ private:
     Mesh            _mesh;
 };
 
+}
