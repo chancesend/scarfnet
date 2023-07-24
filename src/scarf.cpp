@@ -4,6 +4,7 @@
 #include "patterns.h"
 
 #include <Arduino.h>
+#include <json_generator.h>
 
 namespace Scarf
 {
@@ -20,13 +21,32 @@ Scarf::Scarf() :
         [&](){ this->sendMessage(); }) // start with a one second interval
 {
     Serial.printf("Scarf::Scarf()\n");
+
+    initPatterns();
+}
+
+void Scarf::initPatterns()
+{
+    _patterns.push_back({"pride", [](led_list& leds, int32_t time) {
+        pride(leds);
+    }});
+    _patterns.push_back({"noise", [](led_list& leds, int32_t time){ 
+        fillNoise(leds, time);
+    }});
+    _patterns.push_back({"confetti", [](led_list& leds, int32_t time) {
+        confetti(leds);
+    }});
+
+    _currentPattern = _patterns.begin();
 }
 
 void Scarf::sendMessage() {
     String msg = "ID: ";
     msg += _mesh->getNodeId();
-    msg += ", last_press = ";
-    msg += lastSelfButtonPress;
+    msg += ", last_press: ";
+    msg += _lastSelfButtonPress;
+    msg += ", pattern: ";
+    msg += _currentPattern->first;
     _mesh->sendBroadcast(msg);
 
     _mesh->doDelayCalc();
@@ -67,7 +87,8 @@ void Scarf::setup()
     _nextPatternButton.setup();
     _nextPatternButton.addObserver([&](const ObservableButton::Event& event){
         if (event == ObservableButton::Event::ePress) {
-            lastSelfButtonPress = this->_mesh->getNodeTime();
+            _lastSelfButtonPress = this->_mesh->getNodeTime();
+            changePattern();
         }
     });
 
@@ -88,8 +109,8 @@ void Scarf::setup()
     // TODO: enable this task?  
     // _taskCurrrentPatternRun.enable();
 
-//    _blinkNoNodes.set(kBlinkPeriod, _mesh->getNumNodes() * 2, 
-//        [&](){ this->blinkNumNodes(); });
+    _blinkNoNodes.set(kBlinkPeriod, _mesh->getNumNodes() * 2, 
+        [&](){ this->blinkNumNodes(); });
     _userScheduler.addTask(_blinkNoNodes);
     _blinkNoNodes.enable();
 
@@ -135,9 +156,7 @@ void Scarf::showBuiltInLED() {
 
 // Generate the animation every (ms)
 void Scarf::showLEDs() {
-    int timeOnAnimation = 20.0;
-    pride(_leds);
-//    fillNoise(mesh.getNodeTime());
+    _currentPattern->second(_leds, _mesh->getNodeTime());
 
     for (int i = 0; i < _leds.size(); i++) {
         _ledsReal[i] = _leds[i];
@@ -173,17 +192,28 @@ void Scarf::blinkNumNodes() {
     if (_blinkNoNodes.isLastIteration()) {
         // Finished blinking. Reset task for next run 
         // blink number of nodes (including this node) times
-    //    _blinkNoNodes.setIterations(_mesh->getNumNodes() * 2);
+        _blinkNoNodes.setIterations(_mesh->getNumNodes() * 2);
         // Calculate delay based on current mesh time and kBlinkPeriod
         // This results in blinks between nodes being synced
-    //    _blinkNoNodes.enableDelayed(kBlinkPeriod - 
-    //        (_mesh->getNodeTime() % (kBlinkPeriod*1000))/1000);
+        _blinkNoNodes.enableDelayed(kBlinkPeriod - 
+            (_mesh->getNodeTime() % (kBlinkPeriod*1000))/1000);
     }
 }
 
 void Scarf::currentPatternRun()
 {
 
+}
+
+void Scarf::changePattern()
+{
+    auto newPattern = _currentPattern + 1;
+    if (newPattern == _patterns.end())
+    {
+        newPattern = _patterns.begin();
+    }
+    Serial.printf("Changing pattern: %s\n", newPattern->first.c_str());
+    _currentPattern = newPattern;
 }
 
 }   // namespace Scarf

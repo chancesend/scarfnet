@@ -10,6 +10,7 @@
 #include <FastLED.h>
 
 #include <memory>
+#include <string>
 
 namespace Scarf
 {
@@ -51,12 +52,16 @@ private:
     void blinkNumNodes();
     void onConnectionChange();
 
+    void initPatterns();
+    void changePattern();
+
     uint32_t    _timeUsec {0};
     uint32_t    _timeSec{0};
     uint32_t    _usecPeriod{1000000};
     
     ObservableButton      _nextPatternButton;
-    int32_t lastSelfButtonPress = 0;
+    int32_t _lastSelfButtonPress = 0;
+    int32_t _lastAnyMeshPress = 0;
     bool        _onFlag {false};
     
     Task _taskCurrentPatternRun;
@@ -71,6 +76,12 @@ private:
     Scheduler       _userScheduler; // to control your personal task
     
     std::unique_ptr<Mesh>   _mesh;
+
+    typedef std::function<void(led_list&, int32_t)> PatternFcn;
+    typedef std::pair<std::string, PatternFcn> NamedPattern;
+    typedef std::vector<NamedPattern> PatternList;
+    PatternList _patterns;
+    PatternList::iterator _currentPattern;
 };
 
 }

@@ -65,3 +65,19 @@ void fillnoise8(led_list& leds, int32_t time) {
 void fillNoise(led_list& leds, int32_t time) {
   fillnoise8(leds, time);
 }
+
+uint8_t  thisfade = 8;                     // How quickly does it fade? Lower = slower fade rate.
+int       thishue = 192;                   // Starting hue.
+uint8_t   thisinc = 2;                     // Incremental value for rotating hues
+uint8_t   thissat = 255;                   // The saturation, where 255 = brilliant colours.
+uint8_t   thisbri = 255;                   // Brightness of a sequence. Remember, max_bright is the overall limiter.
+int       huediff = 256;                   // Range of random #'s to use for hue
+
+
+void confetti(led_list& leds) {                                             // random colored speckles that blink in and fade smoothly
+    TBlendType currentBlending = LINEARBLEND_NOWRAP;
+    fadeToBlackBy(leds.data(), kNumLeds, thisfade);                    // Low values = slower fade.
+    int pos = random16(kNumLeds); 
+    leds[pos] = ColorFromPalette(currentPalette,  thishue + random16(huediff)/4, thisbri, currentBlending);
+    thishue = thishue + thisinc;                                   // It increments here.
+}

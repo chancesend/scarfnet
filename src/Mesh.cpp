@@ -22,6 +22,12 @@ void Mesh::delayCalc(const NodeList& nodes) {
     }
 }
 
+// TODO: Need to parse the received message
+// for some data:
+//  - Last button pressed
+//  - Name of current pattern
+// Then pass data to Scarf so it can compute correct pattern
+
 void Mesh::receivedCallback(uint32_t from, String & msg) {
     Serial.printf("startHere: Received from %u msg=%s\n", from, msg.c_str());
 }
