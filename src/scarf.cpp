@@ -4,7 +4,7 @@
 #include "patterns.h"
 
 #include <Arduino.h>
-#include <json_generator.h>
+#include <ArduinoJson.h>
 
 namespace Scarf
 {
@@ -17,7 +17,7 @@ Scarf::Scarf() :
     _nextPatternButton(&_userScheduler, kButtonPin),
     _taskCurrentPatternRun( CURRENTPATTERN_SELECT_DEFAULT_INTERVAL, TASK_FOREVER, 
         [&](){ this->currentPatternRun(); }),
-    _taskSendMessage( TASK_SECOND * 1, TASK_FOREVER, 
+    _taskSendMessage( TASK_SECOND * 3, TASK_FOREVER, 
         [&](){ this->sendMessage(); }) // start with a one second interval
 {
     Serial.printf("Scarf::Scarf()\n");
@@ -41,19 +41,18 @@ void Scarf::initPatterns()
 }
 
 void Scarf::sendMessage() {
-    String msg = "ID: ";
-    msg += _mesh->getNodeId();
-    msg += ", last_press: ";
-    msg += _lastSelfButtonPress;
-    msg += ", pattern: ";
-    msg += _currentPattern->first;
-    _mesh->sendBroadcast(msg);
+    DynamicJsonDocument doc(1024);
+
+    doc["id"] = _mesh->getNodeId();
+    doc["lastPress"]   = _lastSelfButtonPress;
+    doc["pattern"] = _currentPattern->first;
+
+    String outJson;
+    serializeJson(doc, outJson);
+    _mesh->sendBroadcast(outJson);
 
     _mesh->doDelayCalc();
-
-    Serial.printf("Sending message: %s\n", msg.c_str());
-    
-    _taskSendMessage.setInterval( random(TASK_SECOND * 1, TASK_SECOND * 5));  // between 1 and 5 seconds
+    Serial.printf("Sending message: %s\n", outJson);
 }
 
 void Scarf::onConnectionChange()
@@ -61,6 +60,18 @@ void Scarf::onConnectionChange()
     Serial.printf("Scarf::onConnectionChange()\n");
     _blinkNoNodes.setIterations(_mesh->getNumNodes() * 2);
     _blinkNoNodes.enableDelayed(kBlinkPeriod - (_mesh->getNodeTime() % (kBlinkPeriod*1000))/1000);
+}
+
+void Scarf::onReceivedData(const DynamicJsonDocument& doc)
+{
+    const char* presetName = doc["preset"];
+    const int   lastRemoteButtonPress = doc["lastPress"];
+    const int   nodeId = doc["id"];
+    if (lastRemoteButtonPress > _lastSelfButtonPress)
+    {
+        changePatternFromString(presetName);
+        _lastSelfButtonPress = lastRemoteButtonPress;
+    }
 }
 
 void Scarf::setup()
@@ -83,12 +94,16 @@ void Scarf::setup()
     _mesh->addConnectionObserver([&](){
         this->onConnectionChange();
     });
+    _mesh->addReceivedDataObserver([&](const DynamicJsonDocument& doc){
+        this->onReceivedData(doc);
+    });
 
     _nextPatternButton.setup();
     _nextPatternButton.addObserver([&](const ObservableButton::Event& event){
         if (event == ObservableButton::Event::ePress) {
             _lastSelfButtonPress = this->_mesh->getNodeTime();
-            changePattern();
+            incrementPattern();
+            _taskSendMessage.forceNextIteration();
         }
     });
 
@@ -205,15 +220,26 @@ void Scarf::currentPatternRun()
 
 }
 
-void Scarf::changePattern()
+void Scarf::incrementPattern()
 {
     auto newPattern = _currentPattern + 1;
     if (newPattern == _patterns.end())
     {
         newPattern = _patterns.begin();
     }
-    Serial.printf("Changing pattern: %s\n", newPattern->first.c_str());
-    _currentPattern = newPattern;
+    changePatternFromString(newPattern->first);
+}
+
+void Scarf::changePatternFromString(const std::string& pattern)
+{
+    auto found = std::find_if(_patterns.begin(), _patterns.end(), [pattern](const NamedPattern& it)->bool {
+        return (pattern == it.first);
+    });
+    if (found != _patterns.end())
+    {
+        _currentPattern = found;
+        Serial.printf("Changing pattern: %s\n", found->first.c_str());
+    }
 }
 
 }   // namespace Scarf

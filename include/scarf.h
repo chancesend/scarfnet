@@ -51,9 +51,11 @@ private:
     void currentPatternRun();
     void blinkNumNodes();
     void onConnectionChange();
+    void onReceivedData(const DynamicJsonDocument& doc);
 
     void initPatterns();
-    void changePattern();
+    void incrementPattern();
+    void changePatternFromString(const std::string& pattern);
 
     uint32_t    _timeUsec {0};
     uint32_t    _timeSec{0};

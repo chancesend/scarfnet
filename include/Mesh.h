@@ -2,6 +2,8 @@
 
 #include <painlessMesh.h>
 
+#include <ArduinoJson.h>
+
 #include <vector>
 
 namespace Scarf
@@ -11,6 +13,7 @@ class Mesh
 {
 public:
     typedef std::function<void()> ConnectionCallback_t;
+    typedef std::function<void(const DynamicJsonDocument&)> ReceivedDataCallback_t;
     
     Mesh(std::string ssid, std::string password, Scheduler* scheduler, uint16_t port);
 
@@ -41,13 +44,25 @@ public:
 
     void addConnectionObserver(const ConnectionCallback_t& observer)
     {
-        _observers.push_back(observer);
+        _connectionObservers.push_back(observer);
     }
     void onConnectionChange()
     {
-        for(const auto& observer: _observers)
+        for(const auto& observer: _connectionObservers)
         {
             observer();
+        }
+    }
+
+    void addReceivedDataObserver(const ReceivedDataCallback_t& observer)
+    {
+        _receivedDataObservers.push_back(observer);
+    }
+    void onReceivedData(const DynamicJsonDocument& doc)
+    {
+        for(const auto& observer: _receivedDataObservers)
+        {
+            observer(doc);
         }
     }
 
@@ -61,8 +76,10 @@ private:
     bool _calcDelay {false};
     painlessMesh    _mesh;
     
-    typedef std::vector<ConnectionCallback_t> ObserverList;
-    ObserverList _observers;
+    typedef std::vector<ConnectionCallback_t> ConnectionObserverList;
+    ConnectionObserverList _connectionObservers;
+    typedef std::vector<ReceivedDataCallback_t> ReceivedDataObserverList;
+    ReceivedDataObserverList _receivedDataObservers;
 };
 
 }

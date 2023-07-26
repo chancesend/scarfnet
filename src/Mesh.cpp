@@ -28,8 +28,10 @@ void Mesh::delayCalc(const NodeList& nodes) {
 //  - Name of current pattern
 // Then pass data to Scarf so it can compute correct pattern
 
-void Mesh::receivedCallback(uint32_t from, String & msg) {
+void Mesh::receivedCallback(uint32_t from, String& msg) {
     Serial.printf("startHere: Received from %u msg=%s\n", from, msg.c_str());
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, msg);
 }
 
 void Mesh::newConnectionCallback(uint32_t nodeId) {
@@ -53,7 +55,7 @@ void Mesh::changedConnectionCallback() {
     this->printConnectionList(nodes);
     _calcDelay = true;
     
-    for (const auto& observer: _observers)
+    for (const auto& observer: _connectionObservers)
     {
         observer();
     }
