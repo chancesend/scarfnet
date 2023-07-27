@@ -32,6 +32,11 @@ void Mesh::receivedCallback(uint32_t from, String& msg) {
     Serial.printf("startHere: Received from %u msg=%s\n", from, msg.c_str());
     DynamicJsonDocument doc(1024);
     deserializeJson(doc, msg);
+
+    for (const auto& observer: _receivedDataObservers)
+    {
+        observer(doc);
+    }
 }
 
 void Mesh::newConnectionCallback(uint32_t nodeId) {

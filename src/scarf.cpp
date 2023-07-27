@@ -30,11 +30,11 @@ void Scarf::initPatterns()
     _patterns.push_back({"pride", [](led_list& leds, int32_t time) {
         pride(leds);
     }});
-    _patterns.push_back({"noise", [](led_list& leds, int32_t time){ 
-        fillNoise(leds, time);
-    }});
     _patterns.push_back({"confetti", [](led_list& leds, int32_t time) {
         confetti(leds);
+    }});
+    _patterns.push_back({"firework", [](led_list& leds, int32_t time) {
+        firework(leds);
     }});
 
     _currentPattern = _patterns.begin();
@@ -52,7 +52,7 @@ void Scarf::sendMessage() {
     _mesh->sendBroadcast(outJson);
 
     _mesh->doDelayCalc();
-    Serial.printf("Sending message: %s\n", outJson);
+    Serial.printf("Sending message: %s\n", outJson.c_str());
 }
 
 void Scarf::onConnectionChange()
@@ -64,13 +64,18 @@ void Scarf::onConnectionChange()
 
 void Scarf::onReceivedData(const DynamicJsonDocument& doc)
 {
-    const char* presetName = doc["preset"];
+    const char* presetName = doc["pattern"];
     const int   lastRemoteButtonPress = doc["lastPress"];
     const int   nodeId = doc["id"];
-    if (lastRemoteButtonPress > _lastSelfButtonPress)
-    {
-        changePatternFromString(presetName);
-        _lastSelfButtonPress = lastRemoteButtonPress;
+    Serial.printf("Scarf::onReceivedData(). lastRemote = %d, _lastanyMesh = %d, _lastSelfButton = %d\n", 
+    lastRemoteButtonPress, _lastAnyMeshPress, _lastSelfButtonPress);
+    if (lastRemoteButtonPress > _lastAnyMeshPress) {
+        _lastAnyMeshPress = lastRemoteButtonPress;
+        if (_lastAnyMeshPress > _lastSelfButtonPress)
+        {
+            Serial.printf("Scarf::onReceivedData(). Changing pattern to %s\n", presetName);
+            changePatternFromString(presetName);
+        }
     }
 }
 
@@ -176,7 +181,7 @@ void Scarf::showLEDs() {
     for (int i = 0; i < _leds.size(); i++) {
         _ledsReal[i] = _leds[i];
     }
-
+#if 1
     if ((_timeUsec / _usecPeriod) > _timeSec)
     {
         // We know that our mesh is at the start of our period,
@@ -188,6 +193,7 @@ void Scarf::showLEDs() {
         }
         _timeSec = (_timeUsec / _usecPeriod);
     }
+#endif
 
     FastLED.show();
 }
@@ -227,6 +233,7 @@ void Scarf::incrementPattern()
     {
         newPattern = _patterns.begin();
     }
+    Serial.printf("Scarf::incrementPattern(). Changing pattern to %s\n", newPattern->first);
     changePatternFromString(newPattern->first);
 }
 
@@ -239,6 +246,9 @@ void Scarf::changePatternFromString(const std::string& pattern)
     {
         _currentPattern = found;
         Serial.printf("Changing pattern: %s\n", found->first.c_str());
+    }
+    else {
+        Serial.printf("Pattern: %s not found!\n", found->first.c_str());
     }
 }
 

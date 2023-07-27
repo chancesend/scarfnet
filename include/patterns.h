@@ -15,3 +15,4 @@ public:
 void fillNoise(led_list& leds, int32_t time);
 void pride(led_list& leds);
 void confetti(led_list& leds);
+void firework(led_list& leds);

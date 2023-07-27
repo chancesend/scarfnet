@@ -57,7 +57,7 @@ void fillnoise8(led_list& leds, int32_t time) {
     // Get a value from the noise function. I'm using both x and y axis.
     uint8_t index = inoise8(0, dist + i * yscale) % 255;
     // With that value, look up the 8 bit colour palette value and assign it to the current LED.
-    leds[i] = ColorFromPalette(currentPalette, index, 255, LINEARBLEND);
+    leds[i] = ColorFromPalette(ForestColors_p, index, 255, LINEARBLEND);
   }
     dist += beatsin8(10, 1, 4, time);                        
 }
@@ -78,6 +78,51 @@ void confetti(led_list& leds) {                                             // r
     TBlendType currentBlending = LINEARBLEND_NOWRAP;
     fadeToBlackBy(leds.data(), kNumLeds, thisfade);                    // Low values = slower fade.
     int pos = random16(kNumLeds); 
+    CRGBPalette16 palette(LavaColors_p);
     leds[pos] = ColorFromPalette(currentPalette,  thishue + random16(huediff)/4, thisbri, currentBlending);
     thishue = thishue + thisinc;                                   // It increments here.
+}
+
+
+/* =============== FIREWORK ANIMATION =============== */
+
+uint8_t firework_eased   = 0;
+uint8_t firework_count   = 0;
+uint8_t firework_lerpVal = 0;
+
+float easeOutQuart(float t) {
+  return 1-(--t)*t*t*t;
+} 
+
+float easeOutQuint(float t) {
+  return 1+(--t)*t*t*t*t;
+}
+
+void firework(led_list& leds) {
+  // Start with easeInVal at 0 and then go to 255 for the full easing.
+  firework_eased = easeOutQuart(firework_count / 255.0) * 255; //ease8InOutCubic(count);
+  firework_count++;
+
+  // Map it to the number of LED's you have.
+  firework_lerpVal = lerp8by8(0, leds.size(), firework_eased);
+
+  uint8_t index = inoise8(0, dist + firework_lerpVal * yscale) % 255;
+  // With that value, look up the 8 bit colour palette value and assign it to the current LED.
+  CRGBPalette16 palette(OceanColors_p);
+  leds[firework_lerpVal] = ColorFromPalette(palette, index, 255, LINEARBLEND);
+  leds[firework_lerpVal].maximizeBrightness();
+
+  fadeToBlackBy(leds.data(), leds.size(), 16);  // 8 bit, 1 = slow fade, 255 = fast fade
+
+//  if (count > 225) {
+//    for (int i = NUM_LEDS - 20; i < NUM_LEDS; i++) {
+//      index = inoise8(0, dist + lerpVal * yscale) % 255;
+//      leds[i] = ColorFromPalette(CRGBPalette16(CHSV(0, 255, 255),
+//                                               CHSV(40, 255, random(225, 255)),
+//                                               CHSV(80, 255, random(225, 255)),
+//                                               CHSV(140, 255, 255)), index, 255, LINEARBLEND);
+////      leds[i].fadeToBlackBy(1);
+//    }
+//  }
+  
 }
