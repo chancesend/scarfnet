@@ -5,6 +5,30 @@
 
 namespace Scarf {
 
+void getPatternList(PatternList& patterns)
+{
+    patterns.push_back({"pride", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
+        pride(leds, timeMs);
+    }});
+    patterns.push_back({"confetti", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
+        confetti(leds, timeMs);
+    }});
+    patterns.push_back({"firework", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
+        const int periodMs = 3 * 1000;
+        firework(leds, timeMs, periodMs);
+    }});
+    patterns.push_back({"cylon", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
+        int width = 4;
+        int periodMs = 3000;
+        cylon(leds, timeMs, CRGB::Red, width, periodMs);
+    }});
+//    _patterns.push_back({"testpattern", [](Leds& leds, int32_t timeMs) {
+//        testpattern(leds, timeMs);
+//    }});
+
+    return;
+}
+
 static int16_t dist;  // A random number for our noise generator.
 uint16_t xscale = 30;  // Wouldn't recommend changing this on the fly, or the animation will be really blocky.
 uint16_t yscale = 30;  // Wouldn't recommend changing this on the fly, or the animation will be really blocky.

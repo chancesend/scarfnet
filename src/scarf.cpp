@@ -27,25 +27,7 @@ Scarf::Scarf() :
 
 void Scarf::initPatterns()
 {
-    _patterns.push_back({"pride", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
-        pride(leds, timeMs);
-    }});
-    _patterns.push_back({"confetti", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
-        confetti(leds, timeMs);
-    }});
-    _patterns.push_back({"firework", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
-        const int periodMs = 3 * 1000;
-        firework(leds, timeMs, periodMs);
-    }});
-    _patterns.push_back({"cylon", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
-        int width = 4;
-        int periodMs = 3000;
-        cylon(leds, timeMs, CRGB::Red, width, periodMs);
-    }});
-//    _patterns.push_back({"testpattern", [](Leds& leds, int32_t timeMs) {
-//        testpattern(leds, timeMs);
-//    }});
-
+    getPatternList(_patterns);
     _currentPattern = _patterns.begin();
 }
 
@@ -78,8 +60,6 @@ void Scarf::onReceivedData(const DynamicJsonDocument& doc)
     const Mesh::TimeMs   lastRemoteButtonPressMs = doc["lastPress"];
     const int   nodeId = doc["id"];
     const Rnd randomizer = doc["randomizer"];
-//    Serial.printf("Scarf::onReceivedData(). lastRemote = %d, _lastanyMesh = %d, _lastSelfButton = %d\n", 
-//        lastRemoteButtonPressMs, _lastAnyMeshPressMs, _lastSelfButtonPressMs);
     const bool isNewRemotePress = (lastRemoteButtonPressMs > _lastAnyMeshPressMs);
     if (isNewRemotePress) {
         _lastAnyMeshPressMs = lastRemoteButtonPressMs;
@@ -157,8 +137,6 @@ void Scarf::setup()
     _userScheduler.addTask(_blinkNoNodes);
     _blinkNoNodes.enable();
 
-//    _nextPatternButton.begin();
-
     randomSeed(micros());
 }
 
@@ -174,6 +152,7 @@ void Scarf::loop()
         updateTime();
         showLEDs();
         showBuiltInLED();
+        FastLED.show();
     }
     const int kWatchdogMs = 5000;
     EVERY_N_MILLISECONDS(kWatchdogMs) {
@@ -217,21 +196,15 @@ void Scarf::showLEDs() {
     for (int i = 0; i < _leds.size(); i++) {
         _ledsReal[i] = _leds[i];
     }
-
-    FastLED.show();
 }
 
 
 bool blinkState = false;
 
 void Scarf::blinkNumNodes() {
-    const int kBlinkDuration = 100;  // milliseconds LED is on for
-    // If on, switch off, else switch on
-    if (_onFlag)
-        _onFlag = false;
-    else
-        _onFlag = true;
-    _blinkNoNodes.delay(kBlinkDuration);
+    const int kBlinkDurationMs = 100;  // milliseconds LED is on for
+    _onFlag = !_onFlag;
+    _blinkNoNodes.delay(kBlinkDurationMs);
 
     if (_blinkNoNodes.isLastIteration()) {
         // Finished blinking. Reset task for next run 
@@ -239,8 +212,9 @@ void Scarf::blinkNumNodes() {
         _blinkNoNodes.setIterations(_mesh->getNumNodes() * 2);
         // Calculate delay based on current mesh time and kBlinkPeriodMs
         // This results in blinks between nodes being synced
-        _blinkNoNodes.enableDelayed(kBlinkPeriodMs - 
-            (_mesh->getNodeTimeMs() % kBlinkPeriodMs)/1000);
+        auto msToNextBlinkSync = kBlinkPeriodMs - 
+            (_mesh->getNodeTimeMs() % kBlinkPeriodMs);
+        _blinkNoNodes.enableDelayed(msToNextBlinkSync);
     }
 }
 

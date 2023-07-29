@@ -2,6 +2,7 @@
 
 #include "Mesh.h"
 #include "ObservableButton.h"
+#include "patterns.h"
 
 #include "defines.h"
 
@@ -82,9 +83,6 @@ private:
     
     std::unique_ptr<Mesh>   _mesh;
 
-    typedef std::function<void(Leds&, int32_t, int32_t)> PatternFcn;
-    typedef std::pair<std::string, PatternFcn> NamedPattern;
-    typedef std::vector<NamedPattern> PatternList;
     PatternList _patterns;
     PatternList::iterator _currentPattern;
     Rnd _currentRandomizer {0};
