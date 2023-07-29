@@ -6,8 +6,9 @@
 #include "defines.h"
 
 #include <Arduino.h>
-#include <M5Stack.h>
 #include <FastLED.h>
+#include <M5Stack.h>
+#include <Preferences.h>
 
 #include <memory>
 #include <string>
@@ -34,7 +35,7 @@ public:
 private:
     const int kNumBuiltinLeds = 1;
 
-    const int kBlinkPeriod = 3000; // milliseconds until cycle repeat
+    const int kBlinkPeriodMs = 3000; // milliseconds until cycle repeat
 
     const int kButtonPin = 39;
 
@@ -55,35 +56,38 @@ private:
 
     void initPatterns();
     void incrementPattern();
-    void changePatternFromString(const std::string& pattern);
+    void changePatternFromString(const std::string& pattern, Rnd randomizer);
 
-    uint32_t    _timeUsec {0};
+    Mesh::TimeMs     _timeMsec {0};
     uint32_t    _timeSec{0};
-    uint32_t    _usecPeriod{1000000};
+    uint32_t    _msecPeriod{2300};
     
     ObservableButton      _nextPatternButton;
-    int32_t _lastSelfButtonPress = 0;
-    int32_t _lastAnyMeshPress = 0;
+    Mesh::TimeMs _lastSelfButtonPressMs {0};
+    Mesh::TimeMs _lastAnyMeshPressMs {0};
     bool        _onFlag {false};
+
+    Preferences preferences;
     
     Task _taskCurrentPatternRun;
     Task _taskSendMessage; // start with a one second interval
     // Task to blink the number of nodes
     Task _blinkNoNodes;
 
-    led_list        _leds;
-    led_list        _ledsReal;
+    Leds        _leds;
+    Leds        _ledsReal;
 
-    led_list        _builtinLED;
+    Leds        _builtinLED;
     Scheduler       _userScheduler; // to control your personal task
     
     std::unique_ptr<Mesh>   _mesh;
 
-    typedef std::function<void(led_list&, int32_t)> PatternFcn;
+    typedef std::function<void(Leds&, int32_t, int32_t)> PatternFcn;
     typedef std::pair<std::string, PatternFcn> NamedPattern;
     typedef std::vector<NamedPattern> PatternList;
     PatternList _patterns;
     PatternList::iterator _currentPattern;
+    Rnd _currentRandomizer {0};
 };
 
 }

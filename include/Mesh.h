@@ -14,13 +14,16 @@ class Mesh
 public:
     typedef std::function<void()> ConnectionCallback_t;
     typedef std::function<void(const DynamicJsonDocument&)> ReceivedDataCallback_t;
+
+    typedef int32_t TimeMs;
     
     Mesh(std::string ssid, std::string password, Scheduler* scheduler, uint16_t port);
 
     void update() { return _mesh.update(); };
     uint32_t getNodeId() { return _mesh.getNodeId(); };
 
-    uint32_t getNodeTime() { return _mesh.getNodeTime(); };
+    uint32_t getNodeTimeMs();
+
     int getNumNodes()
     {
         return (_mesh.getNodeList().size() + 1);
@@ -75,6 +78,8 @@ private:
 
     bool _calcDelay {false};
     painlessMesh    _mesh;
+    TimeMs   _lastNodeTimeMs {0};
+    int32_t     _rolloverCount {0};
     
     typedef std::vector<ConnectionCallback_t> ConnectionObserverList;
     ConnectionObserverList _connectionObservers;

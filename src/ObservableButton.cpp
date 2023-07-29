@@ -33,12 +33,12 @@ void ObservableButton::checkButtonEvent()
     {
         buttonState = kButtonState_LongPressed;
         Serial.printf("Long press!\n");
+        onEvent(Event::eLongPress);
     }
     else if (_button.wasReleased() && buttonState == kButtonState_LongPressed)
     {
         buttonState = kButtonState_Up;
         Serial.printf("Button long press release!\n");
-        onEvent(Event::eLongPress);
     }
     else if (_button.wasReleased() && buttonState == kButtonState_Pressed)
     {

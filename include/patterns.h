@@ -5,14 +5,19 @@
 #include <stdint.h>
 #include <string>
 
+namespace Scarf {
+
 class Pattern
 {
 public:
     virtual std::string name() = 0;
-    virtual void paint(led_list& leds) = 0;
+    virtual void paint(Leds& leds, int32_t timeMs) = 0;
 };
 
-void fillNoise(led_list& leds, int32_t time);
-void pride(led_list& leds);
-void confetti(led_list& leds);
-void firework(led_list& leds);
+void fillNoise(Leds& leds, int32_t timeMs);
+void pride(Leds& leds, int32_t timeMs);
+void confetti(Leds& leds, int32_t timeMs);
+void firework(Leds& leds, int32_t timeMs, int32_t periodMs);
+void cylon(Leds& leds, int32_t timeMs, CRGB c, int width, int periodMs);
+
+}

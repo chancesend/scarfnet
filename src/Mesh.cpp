@@ -29,7 +29,7 @@ void Mesh::delayCalc(const NodeList& nodes) {
 // Then pass data to Scarf so it can compute correct pattern
 
 void Mesh::receivedCallback(uint32_t from, String& msg) {
-    Serial.printf("startHere: Received from %u msg=%s\n", from, msg.c_str());
+    Serial.printf("Received from %u msg=%s\n", from, msg.c_str());
     DynamicJsonDocument doc(1024);
     deserializeJson(doc, msg);
 
@@ -67,11 +67,23 @@ void Mesh::changedConnectionCallback() {
 }
 
 void Mesh::nodeTimeAdjustedCallback(int32_t offset) {
-    Serial.printf("Adjusted time %u. Offset = %d\n", this->getNodeTime(), offset);
+    Serial.printf("Adjusted time %ums. Offset = %d\n", this->getNodeTimeMs(), offset);
 }
 
 void Mesh::delayReceivedCallback(uint32_t from, int32_t delay) {
     Serial.printf("Delay to node %u is %d us\n", from, delay);
+}
+
+uint32_t Mesh::getNodeTimeMs() { 
+    const uint32_t k1024_Exp = 10;
+    const int32_t nodeTimeMs = _mesh.getNodeTime() >> k1024_Exp;
+    const int32_t kRolloverThresholdMs = 1000 * 1000;
+    if (nodeTimeMs - _lastNodeTimeMs < -kRolloverThresholdMs) {
+        _rolloverCount++;
+        Serial.printf("getNodeTime() rollover!\n");
+    }
+    _lastNodeTimeMs = nodeTimeMs;
+    return (nodeTimeMs & 0x003fffff | ((TimeMs)_rolloverCount << (32-k1024_Exp)) & 0xffc00000); 
 }
 
 }   // namespace Scarf
