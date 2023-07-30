@@ -1,26 +1,52 @@
 #include "patterns.h"
 #include "defines.h"
 
+#include <FastLED.h>
+
 #include <stdint.h>
 
 namespace Scarf {
 
+CRGBPalette16 getColorPalette(int8_t i)
+{
+  const std::vector<CRGBPalette16> palettes = {
+    CloudColors_p,
+    LavaColors_p,
+    OceanColors_p,
+    ForestColors_p,
+    RainbowColors_p,
+    RainbowStripeColors_p,
+    PartyColors_p,
+    HeatColors_p
+  };
+
+  const auto palette = palettes[i % palettes.size()];
+
+  return palette;
+}
+
 void getPatternList(PatternList& patterns)
 {
     patterns.push_back({"pride", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
-        pride(leds, timeMs);
+        CRGBPalette16 palette = getColorPalette(randomizer);
+        pride(leds, timeMs, palette);
     }});
     patterns.push_back({"confetti", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
-        confetti(leds, timeMs);
+        CRGBPalette16 palette = getColorPalette(randomizer);
+        confetti(leds, timeMs, palette);
     }});
     patterns.push_back({"firework", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
-        const int periodMs = 3 * 1000;
-        firework(leds, timeMs, periodMs);
+        const int periodMs = 30 * 100;
+        CRGBPalette16 palette = getColorPalette(randomizer);
+        firework(leds, timeMs, periodMs, palette);
     }});
     patterns.push_back({"cylon", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
         int width = 4;
-        int periodMs = 3000;
-        cylon(leds, timeMs, CRGB::Red, width, periodMs);
+        int periodMs = 30 * 100;
+        CHSV hsv(randomizer, 255, 200);
+        CRGB color(hsv);
+        fract8 blurAmount = (randomizer % 20) * 5;
+        cylon(leds, timeMs, color, width, periodMs, blurAmount);
     }});
 //    _patterns.push_back({"testpattern", [](Leds& leds, int32_t timeMs) {
 //        testpattern(leds, timeMs);
@@ -36,7 +62,7 @@ uint8_t maxChanges = 24;  // Value for blending between palettes.
 
 CRGBPalette16 currentPalette(CRGB::White);
 
-void pride(Leds& leds, int32_t timeMs) 
+void pride(Leds& leds, int32_t timeMs, CRGBPalette16 palette) 
 {
   static uint16_t sPseudotime = 0;
   static uint16_t sLastMillis = 0;
@@ -68,7 +94,8 @@ void pride(Leds& leds, int32_t timeMs)
     uint8_t bri8 = (uint32_t)(((uint32_t)bri16) * brightdepth) / 65536;
     bri8 += (255 - brightdepth);
     
-    CRGB newcolor = CHSV( hue8, sat8, bri8);
+//    CRGB newcolor = CHSV( hue8, sat8, bri8);
+    CRGB newcolor = ColorFromPalette(palette,  hue8, bri8, LINEARBLEND);
     
     uint16_t pixelnumber = i;
     pixelnumber = (kNumLeds - 1) - pixelnumber;
@@ -94,7 +121,7 @@ void fillNoise(Leds& leds, int32_t timeMs) {
 
 int       thishue = 150;                   // Starting hue.
 
-void confetti(Leds& leds, int32_t timeMs) {                                             // random colored speckles that blink in and fade smoothly
+void confetti(Leds& leds, int32_t timeMs, CRGBPalette16 palette) {                                             // random colored speckles that blink in and fade smoothly
     uint8_t  thisfade = 12;                     // How quickly does it fade? Lower = slower fade rate.
     uint8_t   thisinc = 20;                     // Incremental value for rotating hues
     uint8_t   thissat = 255;                   // The saturation, where 255 = brilliant colours.
@@ -104,7 +131,6 @@ void confetti(Leds& leds, int32_t timeMs) {                                     
     TBlendType currentBlending = LINEARBLEND_NOWRAP;
     fadeToBlackBy(leds.data(), kNumLeds, thisfade);                    // Low values = slower fade.
     int pos = random16(kNumLeds); 
-    CRGBPalette16 palette(LavaColors_p);
     leds[pos] = ColorFromPalette(palette,  thishue + random16(huediff)/4, thisbri, currentBlending);
     thishue = thishue + thisinc;                                   // It increments here.
 }
@@ -125,7 +151,7 @@ fract8 timeFrac8(int time, int period) {
   return frac;
 }
 
-void firework(Leds& leds, int32_t timeMs, int periodMs) {
+void firework(Leds& leds, int32_t timeMs, int periodMs, CRGBPalette16 palette) {
   const auto fireworkFrac = timeFrac8(timeMs, periodMs);
   // Start with easeInVal at 0 and then go to 255 for the full easing.
   const uint8_t fireworkEased = easeOutQuart((float)fireworkFrac / 255) * 255; //ease8InOutCubic(count);
@@ -135,7 +161,6 @@ void firework(Leds& leds, int32_t timeMs, int periodMs) {
 
   uint8_t index = inoise8(0, dist + fireworkLerpVal * yscale) % 255;
   // With that value, look up the 8 bit colour palette value and assign it to the current LED.
-  CRGBPalette16 palette(OceanColors_p);
   leds[fireworkLerpVal] = ColorFromPalette(palette, index, 255, LINEARBLEND);
   leds[fireworkLerpVal].maximizeBrightness();
 
@@ -163,7 +188,7 @@ void testpattern(Leds& leds, int32_t timeMs) {
 }
 
 // Sliding bar across LEDs
-void cylon(Leds& leds, int32_t timeMs, CRGB c, int width, int periodMs){
+void cylon(Leds& leds, int32_t timeMs, CRGB color, int width, int periodMs, fract8 blurAmount){
   const auto timeFrac = timeFrac8(timeMs, periodMs);
   const auto cylonFrac = quadwave8(timeFrac);
   const uint8_t lerpVal = lerp8by8(0, leds.size(), cylonFrac);
@@ -173,11 +198,12 @@ void cylon(Leds& leds, int32_t timeMs, CRGB c, int width, int periodMs){
     const auto stopLed = lerpVal + width / 2;
     const auto isLit = (i >= startLed) && (i <= stopLed);
     if (isLit) {
-      leds[i] = c;
+      leds[i] = color;
     } else {
       leds[i] = CRGB::Black;
     }
   }
+  blur1d( leds.data(), leds.size(), blurAmount);
 }
 
 } // namespace Scarf

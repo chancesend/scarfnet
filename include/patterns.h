@@ -19,10 +19,10 @@ typedef std::pair<std::string, PatternFcn> NamedPattern;
 typedef std::vector<NamedPattern> PatternList;
 
 void fillNoise(Leds& leds, int32_t timeMs);
-void pride(Leds& leds, int32_t timeMs);
-void confetti(Leds& leds, int32_t timeMs);
-void firework(Leds& leds, int32_t timeMs, int32_t periodMs);
-void cylon(Leds& leds, int32_t timeMs, CRGB c, int width, int periodMs);
+void pride(Leds& leds, int32_t timeMs, CRGBPalette16 palette);
+void confetti(Leds& leds, int32_t timeMs, CRGBPalette16 palette);
+void firework(Leds& leds, int32_t timeMs, int32_t periodMs, CRGBPalette16 palette);
+void cylon(Leds& leds, int32_t timeMs, CRGB c, int width, int periodMs, fract8 blurAmount);
 
 void getPatternList(PatternList& patterns);
 
