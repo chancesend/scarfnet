@@ -85,6 +85,8 @@ private:
 
     PatternList _patterns;
     PatternList::iterator _currentPattern;
+    CRGBPalette16 _currentPalette {CRGB::Black};
+    CRGBPalette16 _targetPalette {RainbowColors_p};
     Rnd _currentRandomizer {0};
 };
 

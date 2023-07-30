@@ -1,29 +1,12 @@
 #include "patterns.h"
 #include "defines.h"
+#include "palettes.h"
 
 #include <FastLED.h>
 
 #include <stdint.h>
 
 namespace Scarf {
-
-CRGBPalette16 getColorPalette(int8_t i)
-{
-  const std::vector<CRGBPalette16> palettes = {
-    CloudColors_p,
-    LavaColors_p,
-    OceanColors_p,
-    ForestColors_p,
-    RainbowColors_p,
-    RainbowStripeColors_p,
-    PartyColors_p,
-    HeatColors_p
-  };
-
-  const auto palette = palettes[i % palettes.size()];
-
-  return palette;
-}
 
 inline uint8_t interpUint8(uint8_t val, uint8_t low, uint8_t high)
 {
@@ -33,29 +16,31 @@ inline uint8_t interpUint8(uint8_t val, uint8_t low, uint8_t high)
 
 void getPatternList(PatternList& patterns)
 {
-    patterns.push_back({"pride", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
-        CRGBPalette16 palette = getColorPalette(randomizer);
+    patterns.push_back({"pride", [](Leds& leds, int32_t timeMs, CRGBPalette16 palette, Rnd randomizer) {
         pride(leds, timeMs, palette);
     }});
-    patterns.push_back({"confetti", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
-        CRGBPalette16 palette = getColorPalette(randomizer);   
-        uint8_t  thisFade = interpUint8((randomizer % 25), 0, 25);                     // How quickly does it fade? Lower = slower fade rate.
+    patterns.push_back({"confetti", [](Leds& leds, int32_t timeMs, CRGBPalette16 palette, Rnd randomizer) {
+        uint8_t  thisFade = interpUint8((randomizer % 25), 1, 25);                     // How quickly does it fade? Lower = slower fade rate.
         uint8_t popChance = interpUint8((randomizer % 25) * 4, 0, 100);
         confetti(leds, timeMs, palette, thisFade, popChance);
     }});
-    patterns.push_back({"firework", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
+    patterns.push_back({"firework", [](Leds& leds, int32_t timeMs, CRGBPalette16 palette, Rnd randomizer) {
         const uint8_t periodInterp = interpUint8((randomizer % 25) * 2, 10, 60);
         const int periodMs = periodInterp * 100;
-        CRGBPalette16 palette = getColorPalette(randomizer);
         firework(leds, timeMs, periodMs, palette);
     }});
-    patterns.push_back({"cylon", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
+    patterns.push_back({"colorwaves", [](Leds& leds, int32_t timeMs, CRGBPalette16 palette, Rnd randomizer) {
+        colorwaves( leds, timeMs, palette);
+    }});
+    patterns.push_back({"cylon", [](Leds& leds, int32_t timeMs, CRGBPalette16 palette, Rnd randomizer) {
         int width = 4;
         const uint8_t periodInterp = interpUint8((randomizer % 25) * 2, 10, 60);
         int periodMs = periodInterp * 100;
-        CHSV hsv(randomizer, 255, 200);
-        CRGB color(hsv);
+  //      CHSV hsv(randomizer, 255, 200);
+  //      CRGB color(hsv);
         fract8 blurAmount = interpUint8((randomizer % 25) * 5, 0, 100);
+        auto paletteChangeDivisor = randomizer % 10 + 5;
+        auto color = ColorFromPalette(palette, (timeMs >> paletteChangeDivisor) % 255);
         cylon(leds, timeMs, color, width, periodMs, blurAmount);
     }});
 //    _patterns.push_back({"testpattern", [](Leds& leds, int32_t timeMs) {
@@ -72,7 +57,7 @@ uint8_t maxChanges = 24;  // Value for blending between palettes.
 
 CRGBPalette16 currentPalette(CRGB::White);
 
-void pride(Leds& leds, int32_t timeMs, CRGBPalette16 palette) 
+void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette) 
 {
   static uint16_t sPseudotime = 0;
   static uint16_t sLastMillis = 0;
@@ -131,11 +116,11 @@ void fillNoise(Leds& leds, int32_t timeMs) {
 
 int       thishue = 150;                   // Starting hue.
 
-void confetti(Leds& leds, int32_t timeMs, CRGBPalette16 palette, uint8_t fade, uint8_t popChancePct) {                                             // random colored speckles that blink in and fade smoothly
+void confetti(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t fade, uint8_t popChancePct) {                                             // random colored speckles that blink in and fade smoothly
     uint8_t   thisinc = 20;                     // Incremental value for rotating hues
     uint8_t   thissat = 255;                   // The saturation, where 255 = brilliant colours.
     uint8_t   thisbri = 200;                   // Brightness of a sequence. Remember, max_bright is the overall limiter.
-    int       huediff = 200;                   // Range of random #'s to use for hue
+    int       huediff = 100;                   // Range of random #'s to use for hue
 
     TBlendType currentBlending = LINEARBLEND_NOWRAP;
     fadeToBlackBy(leds.data(), kNumLeds, fade);                    // Low values = slower fade.
@@ -163,7 +148,7 @@ fract8 timeFrac8(int time, int period) {
   return frac;
 }
 
-void firework(Leds& leds, int32_t timeMs, int periodMs, CRGBPalette16 palette) {
+void firework(Leds& leds, int32_t timeMs, int periodMs, const CRGBPalette16& palette) {
   const auto fireworkFrac = timeFrac8(timeMs, periodMs);
   // Start with easeInVal at 0 and then go to 255 for the full easing.
   const uint8_t fireworkEased = easeOutQuart((float)fireworkFrac / 255) * 255; //ease8InOutCubic(count);
@@ -217,5 +202,75 @@ void cylon(Leds& leds, int32_t timeMs, CRGB color, int width, int periodMs, frac
   }
   blur1d( leds.data(), leds.size(), blurAmount);
 }
+
+void colorwaves( Leds& leds, int32_t timeMs, const CRGBPalette16& palette) 
+{
+  static uint16_t sPseudotime = 0;
+  static uint16_t sLastMillis = 0;
+  static uint16_t sHue16 = 0;
+ 
+  uint8_t sat8 = beatsin88( 87, 220, 250);
+  uint8_t brightdepth = beatsin88( 341, 96, 224);
+  uint16_t brightnessthetainc16 = beatsin88( 203, (25 * 256), (40 * 256));
+  uint8_t msmultiplier = beatsin88(147, 23, 60);
+
+  uint16_t hue16 = sHue16;//gHue * 256;
+  uint16_t hueinc16 = beatsin88(113, 300, 1500);
+  
+  uint16_t ms = timeMs;
+  uint16_t deltams = ms - sLastMillis ;
+  sLastMillis  = ms;
+  sPseudotime += deltams * msmultiplier;
+  sHue16 += deltams * beatsin88( 400, 5,9);
+  uint16_t brightnesstheta16 = sPseudotime;
+  
+  for( uint16_t i = 0 ; i < leds.size(); i++) {
+    hue16 += hueinc16;
+    uint8_t hue8 = hue16 / 256;
+    uint16_t h16_128 = hue16 >> 7;
+    if( h16_128 & 0x100) {
+      hue8 = 255 - (h16_128 >> 1);
+    } else {
+      hue8 = h16_128 >> 1;
+    }
+
+    brightnesstheta16  += brightnessthetainc16;
+    uint16_t b16 = sin16( brightnesstheta16  ) + 32768;
+
+    uint16_t bri16 = (uint32_t)((uint32_t)b16 * (uint32_t)b16) / 65536;
+    uint8_t bri8 = (uint32_t)(((uint32_t)bri16) * brightdepth) / 65536;
+    bri8 += (255 - brightdepth);
+    
+    uint8_t index = hue8;
+    //index = triwave8( index);
+    index = scale8( index, 240);
+
+    CRGB newcolor = ColorFromPalette( palette, index, bri8);
+
+    uint16_t pixelnumber = i;
+    pixelnumber = (leds.size()-1) - pixelnumber;
+    
+    nblend( leds[pixelnumber], newcolor, 128);
+  }
+}
+#if 0
+void lightning(Leds& leds, CRGB c, int simultaneous, int cycles, int speed){
+  int flashes[simultaneous];
+
+  for(int i=0; i<cycles; i++){
+    for(int j=0; j<simultaneous; j++){
+      int idx = random(leds.size());
+      flashes[j] = idx;
+      leds[idx] = c ? c : randomColor();
+    }
+    FastLED.show();
+    delay(speed);
+    for(int s=0; s<simultaneous; s++){
+      leds[flashes[s]] = CRGB::Black;
+    }
+    delay(speed);
+  }
+}
+#endif
 
 } // namespace Scarf

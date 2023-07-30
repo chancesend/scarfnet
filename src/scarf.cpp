@@ -2,6 +2,7 @@
 
 #include "defines.h"
 #include "patterns.h"
+#include "palettes.h"
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
@@ -123,8 +124,8 @@ void Scarf::setup()
     _builtinLED.resize(kNumBuiltinLeds);
     FastLED.addLeds<M5_INTERNAL_TYPE, kBuiltinLedPin>(_builtinLED.data(), _builtinLED.size());
 
-    FastLED.setMaxPowerInVoltsAndMilliamps(5, 500); // FastLED Power management set at 5V, 500mA.
-  
+    FastLED.setMaxPowerInVoltsAndMilliamps(5, 250); // FastLED Power management set at 5V, 200mA.
+
     _userScheduler.addTask( _taskSendMessage );
     _taskSendMessage.enable();
 
@@ -157,6 +158,9 @@ void Scarf::loop()
     const int kWatchdogMs = 5000;
     EVERY_N_MILLISECONDS(kWatchdogMs) {
         watchdog();
+    }
+    EVERY_N_MILLISECONDS(40) {    
+        nblendPaletteTowardPalette( _currentPalette, _targetPalette, 24);
     }
 }
 
@@ -191,7 +195,11 @@ void Scarf::showBuiltInLED() {
 
 // Generate the animation every (ms)
 void Scarf::showLEDs() {
-    _currentPattern->second(_leds, _mesh->getNodeTimeMs(), _currentRandomizer);
+    _currentPattern->second(
+        _leds, 
+        _mesh->getNodeTimeMs(), 
+        _currentPalette,
+        _currentRandomizer);
 
     for (int i = 0; i < _leds.size(); i++) {
         _ledsReal[i] = _leds[i];
@@ -245,6 +253,7 @@ void Scarf::changePatternFromString(const std::string& pattern, Rnd randomizer)
     {
         _currentPattern = found;
         _currentRandomizer = randomizer;
+        _targetPalette = getColorPalette(randomizer);
         Serial.printf("Changing pattern: %s (randomizer %i)\n", found->first.c_str(), _currentRandomizer);
     }
     else {
