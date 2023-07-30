@@ -25,7 +25,7 @@ void getPatternList(PatternList& patterns)
         confetti(leds, timeMs, palette, thisFade, popChance);
     }});
     patterns.push_back({"firework", [](Leds& leds, int32_t timeMs, CRGBPalette16 palette, Rnd randomizer) {
-        const uint8_t periodInterp = interpUint8((randomizer % 25) * 2, 10, 60);
+        const uint8_t periodInterp = interpUint8((randomizer % 25) * 3, 10, 85);
         const int periodMs = periodInterp * 100;
         firework(leds, timeMs, periodMs, palette);
     }});
@@ -33,12 +33,12 @@ void getPatternList(PatternList& patterns)
         colorwaves( leds, timeMs, palette);
     }});
     patterns.push_back({"cylon", [](Leds& leds, int32_t timeMs, CRGBPalette16 palette, Rnd randomizer) {
-        int width = 4;
+        int width = interpUint8((randomizer % 25) * 10, 1, 10);
         const uint8_t periodInterp = interpUint8((randomizer % 25) * 2, 10, 60);
         int periodMs = periodInterp * 100;
   //      CHSV hsv(randomizer, 255, 200);
   //      CRGB color(hsv);
-        fract8 blurAmount = interpUint8((randomizer % 25) * 5, 0, 100);
+        fract8 blurAmount = interpUint8((randomizer % 25) * 4, 0, 100);
         auto paletteChangeDivisor = randomizer % 10 + 5;
         auto color = ColorFromPalette(palette, (timeMs >> paletteChangeDivisor) % 255);
         cylon(leds, timeMs, color, width, periodMs, blurAmount);
