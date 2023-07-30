@@ -25,6 +25,12 @@ CRGBPalette16 getColorPalette(int8_t i)
   return palette;
 }
 
+inline uint8_t interpUint8(uint8_t val, uint8_t low, uint8_t high)
+{
+  auto range = high - low;
+  return val % (range) + low;
+}
+
 void getPatternList(PatternList& patterns)
 {
     patterns.push_back({"pride", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
@@ -32,20 +38,24 @@ void getPatternList(PatternList& patterns)
         pride(leds, timeMs, palette);
     }});
     patterns.push_back({"confetti", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
-        CRGBPalette16 palette = getColorPalette(randomizer);
-        confetti(leds, timeMs, palette);
+        CRGBPalette16 palette = getColorPalette(randomizer);   
+        uint8_t  thisFade = interpUint8((randomizer % 25), 0, 25);                     // How quickly does it fade? Lower = slower fade rate.
+        uint8_t popChance = interpUint8((randomizer % 25) * 4, 0, 100);
+        confetti(leds, timeMs, palette, thisFade, popChance);
     }});
     patterns.push_back({"firework", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
-        const int periodMs = 30 * 100;
+        const uint8_t periodInterp = interpUint8((randomizer % 25) * 2, 10, 60);
+        const int periodMs = periodInterp * 100;
         CRGBPalette16 palette = getColorPalette(randomizer);
         firework(leds, timeMs, periodMs, palette);
     }});
     patterns.push_back({"cylon", [](Leds& leds, int32_t timeMs, Rnd randomizer) {
         int width = 4;
-        int periodMs = 30 * 100;
+        const uint8_t periodInterp = interpUint8((randomizer % 25) * 2, 10, 60);
+        int periodMs = periodInterp * 100;
         CHSV hsv(randomizer, 255, 200);
         CRGB color(hsv);
-        fract8 blurAmount = (randomizer % 20) * 5;
+        fract8 blurAmount = interpUint8((randomizer % 25) * 5, 0, 100);
         cylon(leds, timeMs, color, width, periodMs, blurAmount);
     }});
 //    _patterns.push_back({"testpattern", [](Leds& leds, int32_t timeMs) {
@@ -121,17 +131,19 @@ void fillNoise(Leds& leds, int32_t timeMs) {
 
 int       thishue = 150;                   // Starting hue.
 
-void confetti(Leds& leds, int32_t timeMs, CRGBPalette16 palette) {                                             // random colored speckles that blink in and fade smoothly
-    uint8_t  thisfade = 12;                     // How quickly does it fade? Lower = slower fade rate.
+void confetti(Leds& leds, int32_t timeMs, CRGBPalette16 palette, uint8_t fade, uint8_t popChancePct) {                                             // random colored speckles that blink in and fade smoothly
     uint8_t   thisinc = 20;                     // Incremental value for rotating hues
     uint8_t   thissat = 255;                   // The saturation, where 255 = brilliant colours.
     uint8_t   thisbri = 200;                   // Brightness of a sequence. Remember, max_bright is the overall limiter.
     int       huediff = 200;                   // Range of random #'s to use for hue
 
     TBlendType currentBlending = LINEARBLEND_NOWRAP;
-    fadeToBlackBy(leds.data(), kNumLeds, thisfade);                    // Low values = slower fade.
+    fadeToBlackBy(leds.data(), kNumLeds, fade);                    // Low values = slower fade.
     int pos = random16(kNumLeds); 
-    leds[pos] = ColorFromPalette(palette,  thishue + random16(huediff)/4, thisbri, currentBlending);
+    bool doPop = random16(100) > (100 - popChancePct);
+    if (doPop) {
+      leds[pos] = ColorFromPalette(palette,  thishue + random16(huediff)/4, thisbri, currentBlending);
+    }
     thishue = thishue + thisinc;                                   // It increments here.
 }
 
