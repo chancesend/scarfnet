@@ -116,7 +116,9 @@ void fillNoise(Leds& leds, int32_t timeMs) {
 
 int       thishue = 150;                   // Starting hue.
 
-void confetti(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t fade, uint8_t popChancePct) {                                             // random colored speckles that blink in and fade smoothly
+// random colored speckles that blink in and fade smoothly
+void confetti(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t fade, uint8_t popChancePct) {                                             
+  
     uint8_t   thisinc = 20;                     // Incremental value for rotating hues
     uint8_t   thissat = 255;                   // The saturation, where 255 = brilliant colours.
     uint8_t   thisbri = 200;                   // Brightness of a sequence. Remember, max_bright is the overall limiter.

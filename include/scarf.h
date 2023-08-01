@@ -34,11 +34,7 @@ public:
     void showLEDs();
 
 private:
-    const int kNumBuiltinLeds = 1;
-
     const int kBlinkPeriodMs = 3000; // milliseconds until cycle repeat
-
-    const int kButtonPin = 39;
 
     // Prototypes
 
@@ -57,11 +53,12 @@ private:
 
     void initPatterns();
     void incrementPattern();
+    void samePatternDifferentRandomizer();
     void changePatternFromString(const std::string& pattern, Rnd randomizer);
 
     Mesh::TimeMs     _timeMsec {0};
     uint32_t    _timeSec{0};
-    uint32_t    _msecPeriod{2300};
+    uint32_t    _syncBlinkPeriodMs{5000};
     
     ObservableButton      _nextPatternButton;
     Mesh::TimeMs _lastSelfButtonPressMs {0};
