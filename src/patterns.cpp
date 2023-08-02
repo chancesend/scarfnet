@@ -164,17 +164,18 @@ void firework(Leds& leds, int32_t timeMs, int periodMs, const CRGBPalette16& pal
   leds[fireworkLerpVal].maximizeBrightness();
 
   fadeToBlackBy(leds.data(), leds.size(), 16);  // 8 bit, 1 = slow fade, 255 = fast fade
-
-//  if (count > 225) {
-//    for (int i = NUM_LEDS - 20; i < NUM_LEDS; i++) {
-//      index = inoise8(0, dist + lerpVal * yscale) % 255;
-//      leds[i] = ColorFromPalette(CRGBPalette16(CHSV(0, 255, 255),
-//                                               CHSV(40, 255, random(225, 255)),
-//                                               CHSV(80, 255, random(225, 255)),
-//                                               CHSV(140, 255, 255)), index, 255, LINEARBLEND);
-////      leds[i].fadeToBlackBy(1);
-//    }
-//  }
+#if 0
+  if (fireworkFrac > 225) {
+    for (int i = leds.size() - 20; i < leds.size(); i++) {
+      index = inoise8(0, dist + fireworkLerpVal * yscale) % 255;
+      leds[i] = ColorFromPalette(CRGBPalette16(CHSV(0, 255, 255),
+                                               CHSV(40, 255, random(225, 255)),
+                                               CHSV(80, 255, random(225, 255)),
+                                               CHSV(140, 255, 255)), index, 255, LINEARBLEND);
+      leds[i].fadeToBlackBy(1);
+    }
+  }
+#endif
   
 }
 
