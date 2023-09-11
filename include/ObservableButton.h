@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <functional>
 
-namespace Scarf
+namespace Scarfnet
 {
 
 class ObservableButton

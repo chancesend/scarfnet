@@ -2,9 +2,9 @@
 
 #include <FastLED.h>
 
-namespace Scarf 
+namespace Scarfnet
 {
 
 CRGBPalette16 getColorPalette(int8_t i);
 
-} // namespace Scarf
+} // namespace Scarfnet

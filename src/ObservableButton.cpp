@@ -1,22 +1,22 @@
 #include "ObservableButton.h"
 
-namespace Scarf
+namespace Scarfnet
 {
 
 #define kTaskCheckButtonPressIntervalMs (50) // in milliseconds
 
-ObservableButton::ObservableButton(Scheduler* scheduler, uint8_t buttonPin) :
-    _scheduler(scheduler),
-    _button(buttonPin, 1, 10),
-    _taskCheckButtonEvent( kTaskCheckButtonPressIntervalMs, TASK_FOREVER, 
-        [&](){ this->checkButtonEvent(); })
+ObservableButton::ObservableButton(Scheduler *scheduler, uint8_t buttonPin) : _scheduler(scheduler),
+                                                                                _button(buttonPin, 1, 10),
+                                                                                _taskCheckButtonEvent(kTaskCheckButtonPressIntervalMs, TASK_FOREVER,
+                                                                                                    [&]()
+                                                                                                    { this->checkButtonEvent(); })
 {
     Serial.printf("ObservableButton::ObservableButton()\n");
 }
 
 void ObservableButton::setup()
 {
-    _scheduler->addTask( _taskCheckButtonEvent );
+    _scheduler->addTask(_taskCheckButtonEvent);
     _taskCheckButtonEvent.enable();
 }
 
@@ -25,7 +25,8 @@ void ObservableButton::checkButtonEvent()
     const int32_t kLongPressTimeMs = 1000;
     const auto instantState = _button.read();
 
-    if( _button.wasPressed()) {
+    if (_button.wasPressed())
+    {
         buttonState = kButtonState_Pressed;
         Serial.printf("Button press!\n");
     }
@@ -44,7 +45,7 @@ void ObservableButton::checkButtonEvent()
     {
         buttonState = kButtonState_Up;
         Serial.printf("Button short press release!\n");
-        //selectNextPattern();
+        // selectNextPattern();
         onEvent(Event::ePress);
     }
 }

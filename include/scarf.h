@@ -14,7 +14,7 @@
 #include <memory>
 #include <string>
 
-namespace Scarf
+namespace Scarfnet
 {
 
 template<typename T, typename... Args>

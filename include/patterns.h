@@ -5,7 +5,8 @@
 #include <stdint.h>
 #include <string>
 
-namespace Scarf {
+namespace Scarfnet 
+{
 
 class Pattern
 {

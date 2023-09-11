@@ -3,15 +3,17 @@
 #include "defines.h"
 #include "Scarf.h"
 
-Scarf::Scarf scarf;
+Scarfnet::Scarf scarf;
 
 // This is pre-defined by arduino
-void setup() {
+void setup()
+{
     Serial.printf("setup()\n");
     scarf.setup();
 }
 
 // This is pre-defined by arduino
-void loop() {
+void loop()
+{
     scarf.loop();
 }

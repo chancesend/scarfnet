@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace Scarf
+namespace Scarfnet
 {
 
 class Mesh

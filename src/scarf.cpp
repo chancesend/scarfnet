@@ -7,17 +7,18 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 
-namespace Scarf
+namespace Scarfnet
 {
 
-#define CURRENTPATTERN_SELECT_DEFAULT_INTERVAL     1   // default scheduling time for currentPatternSELECT, in milliseconds
+#define CURRENTPATTERN_SELECT_DEFAULT_INTERVAL 1 // default scheduling time for currentPatternSELECT, in milliseconds
 
-Scarf::Scarf() :
-    _nextPatternButton(&_userScheduler, kButtonPin),
-    _taskCurrentPatternRun( CURRENTPATTERN_SELECT_DEFAULT_INTERVAL, TASK_FOREVER, 
-        [&](){ this->currentPatternRun(); }),
-    _taskSendMessage( TASK_SECOND * 3, TASK_FOREVER, 
-        [&](){ this->sendMessage(); }) // start with a one second interval
+Scarf::Scarf() : _nextPatternButton(&_userScheduler, kButtonPin),
+                    _taskCurrentPatternRun(CURRENTPATTERN_SELECT_DEFAULT_INTERVAL, TASK_FOREVER,
+                                        [&]()
+                                        { this->currentPatternRun(); }),
+                    _taskSendMessage(TASK_SECOND * 3, TASK_FOREVER,
+                                    [&]()
+                                    { this->sendMessage(); }) // start with a one second interval
 {
     Serial.printf("Scarf::Scarf()\n");
 
@@ -30,13 +31,14 @@ void Scarf::initPatterns()
     _currentPattern = _patterns.begin();
 }
 
-void Scarf::sendMessage() {
+void Scarf::sendMessage()
+{
     DynamicJsonDocument doc(1024);
 
-    doc["id"] =             _mesh->getNodeId();
-    doc["lastPress"]   =    _lastSelfButtonPressMs;
-    doc["pattern"] =        _currentPattern->first;
-    doc["randomizer"] =     (Rnd)_lastSelfButtonPressMs & (~((Rnd)0));
+    doc["id"] = _mesh->getNodeId();
+    doc["lastPress"] = _lastSelfButtonPressMs;
+    doc["pattern"] = _currentPattern->first;
+    doc["randomizer"] = (Rnd)_lastSelfButtonPressMs & (~((Rnd)0));
 
     String outJson;
     serializeJson(doc, outJson);
@@ -50,17 +52,18 @@ void Scarf::onConnectionChange()
 {
     Serial.printf("Scarf::onConnectionChange()\n");
     _blinkNoNodes.setIterations(_mesh->getNumNodes() * 2);
-    _blinkNoNodes.enableDelayed(kBlinkPeriodMs - (_mesh->getNodeTimeMs() % kBlinkPeriodMs)/1000);
+    _blinkNoNodes.enableDelayed(kBlinkPeriodMs - (_mesh->getNodeTimeMs() % kBlinkPeriodMs) / 1000);
 }
 
-void Scarf::onReceivedData(const DynamicJsonDocument& doc)
+void Scarf::onReceivedData(const DynamicJsonDocument &doc)
 {
-    const char* presetName = doc["pattern"];
+    const char *presetName = doc["pattern"];
     const Mesh::TimeMs lastRemoteButtonPressMs = doc["lastPress"];
     const int nodeId = doc["id"];
     const Rnd randomizer = doc["randomizer"];
     const bool isNewRemotePress = (lastRemoteButtonPressMs > _lastAnyMeshPressMs);
-    if (isNewRemotePress) {
+    if (isNewRemotePress)
+    {
         _lastAnyMeshPressMs = lastRemoteButtonPressMs;
         const bool isRemoteButtonWasLastPressed = (_lastAnyMeshPressMs > _lastSelfButtonPressMs);
         if (isRemoteButtonWasLastPressed)
@@ -76,45 +79,43 @@ void Scarf::setup()
     Serial.printf("Scarf::setup()\n");
     // put your setup code here, to run once:
 
-    #if 0
-    M5.begin(
-        true,  // SerialEnable
-        false, // I2CEnable
-        true   // DisplayEnable
-    );
-    #endif
+#if 0
+M5.begin(
+    true,  // SerialEnable
+    false, // I2CEnable
+    true   // DisplayEnable
+);
+#endif
 
     Serial.begin(115200);
     Serial.printf("Hello world!\n");
-    
+
     _mesh = make_unique<Mesh>(kMeshSSID, kMeshPassword, &_userScheduler, kMeshPort);
-    _mesh->addConnectionObserver([&](){
-        this->onConnectionChange();
-    });
-    _mesh->addReceivedDataObserver([&](const DynamicJsonDocument& doc){
-        this->onReceivedData(doc);
-    });
+    _mesh->addConnectionObserver([&]()
+                                    { this->onConnectionChange(); });
+    _mesh->addReceivedDataObserver([&](const DynamicJsonDocument &doc)
+                                    { this->onReceivedData(doc); });
 
     _nextPatternButton.setup();
-    _nextPatternButton.addObserver([&](const ObservableButton::Event& event){
-        switch(event)
+    _nextPatternButton.addObserver([&](const ObservableButton::Event &event)
+                                    {
+    switch(event)
+    {
+        case ObservableButton::Event::ePress:
         {
-            case ObservableButton::Event::ePress:
-            {
-                _lastSelfButtonPressMs = this->_mesh->getNodeTimeMs();
-                incrementPattern();
-                _taskSendMessage.forceNextIteration();
-                break;
-            }
-            case ObservableButton::Event::eLongPress:
-            {
-                _lastSelfButtonPressMs = this->_mesh->getNodeTimeMs();
-                samePatternDifferentRandomizer();
-                _taskSendMessage.forceNextIteration();
-                break;
-            }
+            _lastSelfButtonPressMs = this->_mesh->getNodeTimeMs();
+            incrementPattern();
+            _taskSendMessage.forceNextIteration();
+            break;
         }
-    });
+        case ObservableButton::Event::eLongPress:
+        {
+            _lastSelfButtonPressMs = this->_mesh->getNodeTimeMs();
+            samePatternDifferentRandomizer();
+            _taskSendMessage.forceNextIteration();
+            break;
+        }
+    } });
 
     _leds.resize(kNumLeds);
     _ledsReal.resize(kNumLeds);
@@ -126,17 +127,18 @@ void Scarf::setup()
 
     FastLED.setMaxPowerInMilliWatts(500);
 
-    _userScheduler.addTask( _taskSendMessage );
+    _userScheduler.addTask(_taskSendMessage);
     _taskSendMessage.enable();
 
-    _userScheduler.addTask( _taskCurrentPatternRun );
-    // TODO: enable this task?  
+    _userScheduler.addTask(_taskCurrentPatternRun);
+    // TODO: enable this task?
     // _taskCurrrentPatternRun.enable();
 
-    _blinkNoNodes.set(kBlinkPeriodMs, _mesh->getNumNodes() * 2, 
-        [&](){ this->blinkNumNodes(); });
+    _blinkNoNodes.set(kBlinkPeriodMs, _mesh->getNumNodes() * 2,
+                        [&]()
+                        { this->blinkNumNodes(); });
     _userScheduler.addTask(_blinkNoNodes);
-//    _blinkNoNodes.enable();
+    //    _blinkNoNodes.enable();
 
     randomSeed(micros());
 }
@@ -145,22 +147,25 @@ void Scarf::loop()
 {
     // put your main code here, to run repeatedly:
 
-//  M5.update();
+    //  M5.update();
     _mesh->update();
 
     const int kLedRefreshRateMs = 15;
-    EVERY_N_MILLISECONDS(kLedRefreshRateMs) {
+    EVERY_N_MILLISECONDS(kLedRefreshRateMs)
+    {
         updateTime();
         showLEDs();
         showBuiltInLED();
         FastLED.show();
     }
     const int kWatchdogMs = 5000;
-    EVERY_N_MILLISECONDS(kWatchdogMs) {
+    EVERY_N_MILLISECONDS(kWatchdogMs)
+    {
         watchdog();
     }
-    EVERY_N_MILLISECONDS(40) {    
-        nblendPaletteTowardPalette( _currentPalette, _targetPalette, 24);
+    EVERY_N_MILLISECONDS(40)
+    {
+        nblendPaletteTowardPalette(_currentPalette, _targetPalette, 24);
     }
 }
 
@@ -174,15 +179,16 @@ void Scarf::updateTime()
     _timeMsec = _mesh->getNodeTimeMs();
 }
 
-void Scarf::showBuiltInLED() {
+void Scarf::showBuiltInLED()
+{
     auto color = _onFlag ? CRGB::Blue : CRGB::Black;
     auto syncColor = CRGB::Red;
     for (int i = 0; i < _builtinLED.size(); ++i)
     {
         _builtinLED[i] = CRGB::Black;
         // Every few second or we blink how many nodes are connected
-//        _builtinLED[i] = color;
-        
+        //        _builtinLED[i] = color;
+
         // We also do a sync blink every few seconds
         uint32_t thisTimeMsec = _timeMsec / _syncBlinkPeriodMs;
         if (thisTimeMsec > _timeSec)
@@ -191,45 +197,46 @@ void Scarf::showBuiltInLED() {
             _timeSec = thisTimeMsec;
         }
     }
-    
 }
 
 // Generate the animation every (ms)
-void Scarf::showLEDs() {
+void Scarf::showLEDs()
+{
     _currentPattern->second(
-        _leds, 
-        _mesh->getNodeTimeMs(), 
+        _leds,
+        _mesh->getNodeTimeMs(),
         _currentPalette,
         _currentRandomizer);
 
-    for (int i = 0; i < _leds.size(); i++) {
+    for (int i = 0; i < _leds.size(); i++)
+    {
         _ledsReal[i] = _leds[i];
     }
 }
 
-
 bool blinkState = false;
 
-void Scarf::blinkNumNodes() {
-    const int kBlinkDurationMs = 100;  // milliseconds LED is on for
+void Scarf::blinkNumNodes()
+{
+    const int kBlinkDurationMs = 100; // milliseconds LED is on for
     _onFlag = !_onFlag;
     _blinkNoNodes.delay(kBlinkDurationMs);
 
-    if (_blinkNoNodes.isLastIteration()) {
-        // Finished blinking. Reset task for next run 
+    if (_blinkNoNodes.isLastIteration())
+    {
+        // Finished blinking. Reset task for next run
         // blink number of nodes (including this node) times
         _blinkNoNodes.setIterations(_mesh->getNumNodes() * 2);
         // Calculate delay based on current mesh time and kBlinkPeriodMs
         // This results in blinks between nodes being synced
-        auto msToNextBlinkSync = kBlinkPeriodMs - 
-            (_mesh->getNodeTimeMs() % kBlinkPeriodMs);
+        auto msToNextBlinkSync = kBlinkPeriodMs -
+                                    (_mesh->getNodeTimeMs() % kBlinkPeriodMs);
         _blinkNoNodes.enableDelayed(msToNextBlinkSync);
     }
 }
 
 void Scarf::currentPatternRun()
 {
-
 }
 
 void Scarf::incrementPattern()
@@ -254,11 +261,10 @@ void Scarf::samePatternDifferentRandomizer()
     changePatternFromString(newPattern->first, randomizer);
 }
 
-void Scarf::changePatternFromString(const std::string& pattern, Rnd randomizer)
+void Scarf::changePatternFromString(const std::string &pattern, Rnd randomizer)
 {
-    auto found = std::find_if(_patterns.begin(), _patterns.end(), [pattern](const NamedPattern& it)->bool {
-        return (pattern == it.first);
-    });
+    auto found = std::find_if(_patterns.begin(), _patterns.end(), [pattern](const NamedPattern &it) -> bool
+                                { return (pattern == it.first); });
     if (found != _patterns.end())
     {
         _currentPattern = found;
@@ -266,9 +272,10 @@ void Scarf::changePatternFromString(const std::string& pattern, Rnd randomizer)
         _targetPalette = getColorPalette(randomizer);
         Serial.printf("Changing pattern: %s (randomizer %i)\n", found->first.c_str(), _currentRandomizer);
     }
-    else {
+    else
+    {
         Serial.printf("Pattern: %s not found!\n", found->first.c_str());
     }
 }
 
-}   // namespace Scarf
+} // namespace Scarfnet
