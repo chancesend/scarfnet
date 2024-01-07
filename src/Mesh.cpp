@@ -1,31 +1,40 @@
 #include "Mesh.h"
+#include "log.h"
 
 namespace Scarfnet
 {
 
 Mesh::Mesh(std::string ssid, std::string password, Scheduler *scheduler, uint16_t port)
 {
-    _mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION | SYNC); // set before init() so that you can see error messages
+    
+    _mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION | MESH_STATUS | SYNC); // set before init() so that you can see error messages
     _mesh.init(ssid.c_str(), password.c_str(), scheduler, port);
+
     _mesh.onReceive([&](uint32_t from, TSTRING &msg)
-                    { this->receivedCallback(from, msg); });
+        { this->receivedCallback(from, msg); });
     _mesh.onNewConnection([&](uint32_t nodeId)
-                            { this->newConnectionCallback(nodeId); });
+        { 
+        Serial.printf("###NEW CONNECTION!!\n");
+            this->newConnectionCallback(nodeId); 
+            });
+    _mesh.onDroppedConnection([&](uint32_t nodeId) 
+        { this->droppedConnectionCallback(nodeId); });
     _mesh.onChangedConnections([&]()
-                                { this->changedConnectionCallback(); });
+        { this->changedConnectionCallback(); });
     _mesh.onNodeTimeAdjusted([&](int32_t offset)
-                                { this->nodeTimeAdjustedCallback(offset); });
+        { this->nodeTimeAdjustedCallback(offset); });
     _mesh.onNodeDelayReceived([&](uint32_t nodeId, int32_t delay)
-                                { this->delayReceivedCallback(nodeId, delay); });
+        { this->delayReceivedCallback(nodeId, delay); });
+    Serial.printf("Mesh::Mesh\n");
 }
 
-void Mesh::delayCalc(const NodeList &nodes)
+void Mesh::delayCalc(NodeList &nodes) 
 {
     if (_calcDelay)
     {
-        for (NodeList::const_iterator node = nodes.begin(); node != nodes.end(); ++node)
+        for (auto node = nodes.begin(); node != nodes.end(); node++)
         {
-            _mesh.startDelayMeas(*node);
+            auto isNodeIdConnected = _mesh.startDelayMeas(*node);
         }
         _calcDelay = false;
     }
@@ -39,11 +48,11 @@ void Mesh::delayCalc(const NodeList &nodes)
 
 void Mesh::receivedCallback(uint32_t from, String &msg)
 {
-    Serial.printf("Received from %u msg=%s\n", from, msg.c_str());
+    Serial.printf("[MESH][RCV node %u] msg=%s\n", from, msg.c_str());
     DynamicJsonDocument doc(1024);
     deserializeJson(doc, msg);
 
-    for (const auto &observer : _receivedDataObservers)
+    for (const auto& observer : _receivedDataObservers)
     {
         observer(doc);
     }
@@ -51,30 +60,38 @@ void Mesh::receivedCallback(uint32_t from, String &msg)
 
 void Mesh::newConnectionCallback(uint32_t nodeId)
 {
-    Serial.printf("--> startHere: New Connection, nodeId = %u, %s\n",
-                    nodeId, _mesh.subConnectionJson(true).c_str());
+    auto jsonLayout = _mesh.subConnectionJson(true);
+    Serial.printf("[MESH][NEW node %u] %s\n",
+                    nodeId, jsonLayout.c_str());
 }
 
-void Mesh::printConnectionList(const NodeList &nodes)
+void Mesh::droppedConnectionCallback(uint32_t nodeId)
+{
+    auto jsonLayout = _mesh.subConnectionJson(true);
+    Serial.printf("[MESH][DROP node %u] %s\n",
+                    nodeId, jsonLayout.c_str());
+}
+
+void Mesh::printConnectionList(NodeList &nodes)
 {
     Serial.printf("Connection list (%d nodes):", nodes.size());
 
-    for (NodeList::const_iterator node = nodes.begin(); node != nodes.end(); node++)
+    for (auto node = nodes.begin(); node != nodes.end(); node++)
     {
         Serial.printf(" %u", *node);
     }
-    Serial.println();
+    Serial.printf("\n");
 }
 
 void Mesh::changedConnectionCallback()
 {
-    Serial.printf("Changed connections\n");
+    Serial.printf("[MESH] Changed connections\n");
     NodeList nodes = _mesh.getNodeList();
 
     this->printConnectionList(nodes);
     _calcDelay = true;
 
-    for (const auto &observer : _connectionObservers)
+    for (const auto& observer : _connectionObservers)
     {
         observer();
     }
@@ -82,12 +99,17 @@ void Mesh::changedConnectionCallback()
 
 void Mesh::nodeTimeAdjustedCallback(int32_t offset)
 {
-    Serial.printf("Adjusted time %ums. Offset = %d\n", this->getNodeTimeMs(), offset);
+    Serial.printf("[MESH] Adjusted time %ums. Offset = %d\n", this->getNodeTimeMs(), offset);
 }
 
 void Mesh::delayReceivedCallback(uint32_t from, int32_t delay)
 {
-    Serial.printf("Delay to node %u is %d us\n", from, delay);
+    Serial.printf("[MESH] Delay to node %u is %d us\n", from, delay);
+}
+
+uint32_t Mesh::getMeshNodeTimeRaw()
+{
+    return _mesh.getNodeTime();
 }
 
 uint32_t Mesh::getNodeTimeMs()

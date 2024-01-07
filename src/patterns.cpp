@@ -1,6 +1,7 @@
 #include "patterns.h"
 #include "defines.h"
 #include "palettes.h"
+#include "log.h"
 
 #include <FastLED.h>
 
@@ -15,8 +16,12 @@ inline uint8_t interpUint8(uint8_t val, uint8_t low, uint8_t high)
   return val % (range) + low;
 }
 
-void getPatternList(PatternList &patterns)
+PatternList getPatternList()
 {
+  Serial.printf("getPatternList()\n");
+  PatternList patterns;
+  patterns.clear();
+  
   patterns.push_back({"pride", [](Leds &leds, int32_t timeMs, CRGBPalette16 palette, Rnd randomizer)
                       {
                         pride(leds, timeMs, palette);
@@ -49,17 +54,22 @@ void getPatternList(PatternList &patterns)
                         auto color = ColorFromPalette(palette, (timeMs >> paletteChangeDivisor) % 255);
                         cylon(leds, timeMs, color, width, periodMs, blurAmount);
                       }});
+
   //    _patterns.push_back({"testpattern", [](Leds& leds, int32_t timeMs) {
   //        testpattern(leds, timeMs);
   //    }});
 
-  return;
+  Serial.printf("Pattern list (%zu patterns): ", patterns.size());
+  for (auto pattern: patterns) {
+    Serial.printf("%s, ", pattern.first.c_str());
+  }
+  Serial.printf("\n");
+
+  return patterns;
 }
 
 static int16_t dist;     // A random number for our noise generator.
-uint16_t xscale = 30;    // Wouldn't recommend changing this on the fly, or the animation will be really blocky.
-uint16_t yscale = 30;    // Wouldn't recommend changing this on the fly, or the animation will be really blocky.
-uint8_t maxChanges = 24; // Value for blending between palettes.
+const uint16_t yscale = 30;    // Wouldn't recommend changing this on the fly, or the animation will be really blocky.
 
 CRGBPalette16 currentPalette(CRGB::White);
 

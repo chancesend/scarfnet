@@ -1,7 +1,13 @@
 #pragma once
 
-#define FASTLED_INTERNAL (1)
+#define USE_GET_MILLISECOND_TIMER (true)
+#define SCARFNET_EMBEDDED (1)
+
+#if SCARFNET_EMBEDDED
+//#define FASTLED_INTERNAL (1)
 #include <FastLED.h>
+#endif
+
 #include <painlessMesh.h>
 
 #include <string>

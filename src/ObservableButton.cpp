@@ -1,9 +1,10 @@
 #include "ObservableButton.h"
+#include "log.h"
 
 namespace Scarfnet
 {
 
-#define kTaskCheckButtonPressIntervalMs (50) // in milliseconds
+const unsigned long kTaskCheckButtonPressIntervalMs = 50; // in milliseconds
 
 ObservableButton::ObservableButton(Scheduler *scheduler, uint8_t buttonPin) : _scheduler(scheduler),
                                                                                 _button(buttonPin, 1, 10),
@@ -27,23 +28,23 @@ void ObservableButton::checkButtonEvent()
 
     if (_button.wasPressed())
     {
-        buttonState = kButtonState_Pressed;
+        _buttonState = kButtonState_Pressed;
         Serial.printf("Button press!\n");
     }
-    else if (_button.pressedFor(kLongPressTimeMs) && buttonState != kButtonState_LongPressed)
+    else if (_button.pressedFor(kLongPressTimeMs) && _buttonState != kButtonState_LongPressed)
     {
-        buttonState = kButtonState_LongPressed;
+        _buttonState = kButtonState_LongPressed;
         Serial.printf("Long press!\n");
         onEvent(Event::eLongPress);
     }
-    else if (_button.wasReleased() && buttonState == kButtonState_LongPressed)
+    else if (_button.wasReleased() && _buttonState == kButtonState_LongPressed)
     {
-        buttonState = kButtonState_Up;
+        _buttonState = kButtonState_Up;
         Serial.printf("Button long press release!\n");
     }
-    else if (_button.wasReleased() && buttonState == kButtonState_Pressed)
+    else if (_button.wasReleased() && _buttonState == kButtonState_Pressed)
     {
-        buttonState = kButtonState_Up;
+        _buttonState = kButtonState_Up;
         Serial.printf("Button short press release!\n");
         // selectNextPattern();
         onEvent(Event::ePress);

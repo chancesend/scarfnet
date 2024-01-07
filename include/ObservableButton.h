@@ -2,9 +2,13 @@
 
 #include "defines.h"
 
+#if SCARFNET_EMBEDDED
 #include <Arduino.h>
 #include <M5Stack.h>
+
+//#define FASTLED_INTERNAL (1)
 #include <FastLED.h>
+#endif
 
 #include <list>
 #include <stdint.h>
@@ -52,7 +56,7 @@ private:
     void checkButtonEvent();
 
     Task _taskCheckButtonEvent;
-    ButtonState buttonState = kButtonState_Up;
+    ButtonState _buttonState = kButtonState_Up;
     Button _button;
 
     typedef std::vector<EventCallback_t> MyObserverList;

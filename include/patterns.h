@@ -26,6 +26,6 @@ void firework(Leds& leds, int32_t timeMs, int32_t periodMs, const CRGBPalette16&
 void cylon(Leds& leds, int32_t timeMs, CRGB c, int width, int periodMs, fract8 blurAmount);
 void colorwaves( Leds& leds, int32_t timeMs, const CRGBPalette16& palette);
 
-void getPatternList(PatternList& patterns);
+PatternList getPatternList();
 
 }

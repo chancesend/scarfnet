@@ -3,6 +3,7 @@
 #include "Mesh.h"
 #include "ObservableButton.h"
 #include "patterns.h"
+#include "PatternManager.h"
 
 #include "defines.h"
 
@@ -13,6 +14,7 @@
 
 #include <memory>
 #include <string>
+//#include <mutex>
 
 namespace Scarfnet
 {
@@ -31,46 +33,44 @@ public:
     void setup();
     void loop();
 
-    void showLEDs();
+    Mesh::TimeMs getTimeMsec() { return this->_timeMsec; }
 
 private:
     const int kBlinkPeriodMs = 3000; // milliseconds until cycle repeat
 
     // Prototypes
 
+    void showLEDs();
     void showBuiltInLED();
     void updateTime();
     void initMesh();
     void watchdog();
+    void processEvent(const ObservableButton::Event &event);
     
     int  getNumNodes();
 
     void sendMessage();
-    void currentPatternRun();
     void blinkNumNodes();
     void onConnectionChange();
     void onReceivedData(const DynamicJsonDocument& doc);
 
-    void initPatterns();
-    void incrementPattern();
-    void samePatternDifferentRandomizer();
-    void changePatternFromString(const std::string& pattern, Rnd randomizer);
-
     Mesh::TimeMs     _timeMsec {0};
-    uint32_t    _timeSec{0};
     uint32_t    _syncBlinkPeriodMs{5000};
     
     ObservableButton      _nextPatternButton;
     Mesh::TimeMs _lastSelfButtonPressMs {0};
-    Mesh::TimeMs _lastAnyMeshPressMs {0};
+    Mesh::TimeMs _lastAnyRemotePressMs {0};
     bool        _onFlag {false};
 
-    Preferences preferences;
+    Preferences _preferences;
     
     Task _taskCurrentPatternRun;
     Task _taskSendMessage; // start with a one second interval
     // Task to blink the number of nodes
     Task _blinkNoNodes;
+
+    uint32_t    _changeIndex {0};
+ //   std::mutex  _mutex;
 
     Leds        _leds;
     Leds        _ledsReal;
@@ -80,11 +80,7 @@ private:
     
     std::unique_ptr<Mesh>   _mesh;
 
-    PatternList _patterns;
-    PatternList::iterator _currentPattern;
-    CRGBPalette16 _currentPalette {CRGB::Black};
-    CRGBPalette16 _targetPalette {RainbowColors_p};
-    Rnd _currentRandomizer {0};
+    PatternManager::Ptr  _patternManager;
 };
 
 }
