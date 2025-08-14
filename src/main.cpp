@@ -1,7 +1,7 @@
 #include "main.h"
 #include "PatternManager.h"
 #include "defines.h"
-#include "Scarf.h"
+#include "scarf.h"
 #include "Mesh.h"
 #include "log.h"
 

@@ -14,6 +14,8 @@ void test_simple() {
 
 int main( int argc, char **argv) {
     UNITY_BEGIN();
+
     RUN_TEST(test_simple);
+    
     UNITY_END();
 }

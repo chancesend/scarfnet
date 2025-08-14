@@ -29,6 +29,7 @@ template<uint8_t DATA_PIN> class ADAFRUIT : public WS2812Controller800Khz<DATA_P
 template<uint8_t DATA_PIN> class AMAZON : public WS2812Controller800Khz<DATA_PIN, RGB> {};
 template<uint8_t DATA_PIN> class M5_INTERNAL_TYPE : public WS2812Controller800Khz<DATA_PIN, GRB> {};
 
+//#define LED_TYPE ADAFRUIT
 #define LED_TYPE AMAZON
 
 typedef std::vector<CRGB> Leds;
