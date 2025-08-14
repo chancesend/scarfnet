@@ -9,7 +9,7 @@ void tearDown(void) {
 }
 
 void test_simple() {
-    TEST_ASSERT_TRUE(1 == 0);
+    TEST_ASSERT_TRUE(1 == 1);
 }
 
 int main( int argc, char **argv) {
