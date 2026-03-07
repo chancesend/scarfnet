@@ -1,5 +1,9 @@
 #include <unity.h>
 
+#include "mesh/test_mesh.h"
+#include "observable_button/test_ObservableButton.h"
+#include "patterns/test_patterns.h"
+
 void setUp(void) {
     // set stuff up here
 }
@@ -16,6 +20,9 @@ int main( int argc, char **argv) {
     UNITY_BEGIN();
 
     RUN_TEST(test_simple);
+    mesh_tests();
+    observable_button_tests();
+    patterns_tests();
     
     UNITY_END();
 }
