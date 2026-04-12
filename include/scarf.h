@@ -2,6 +2,7 @@
 
 #include "Mesh.h"
 #include "ObservableButton.h"
+#include "OtaManager.h"
 #include "patterns.h"
 #include "PatternManager.h"
 
@@ -34,7 +35,9 @@ public:
 
     void setup();
     void loop();
+    void otaLoop();
 
+    bool isInOtaMode() const { return _otaManager && _otaManager->isActive(); }
     Mesh::TimeMs getTimeMsec() { return this->_timeMsec; }
 
 private:
@@ -73,7 +76,8 @@ private:
     Leds        _builtinLED;
     Scheduler       _userScheduler; // to control your personal task
     
-    std::unique_ptr<Mesh>   _mesh;
+    std::unique_ptr<Mesh>       _mesh;
+    std::unique_ptr<OtaManager> _otaManager;
 
     PatternManager::Ptr  _patternManager;
 };

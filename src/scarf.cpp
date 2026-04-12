@@ -4,7 +4,6 @@
 #include "patterns.h"
 #include "palettes.h"
 #include "log.h"
-
 //#include <Arduino.h>
 #include <ArduinoJson.h>
 
@@ -84,6 +83,19 @@ void Scarf::onReceivedData(const JsonDocument &doc)
 void Scarf::setup()
 {
     Scarfnet::log("Scarf::setup()\n");
+
+    // Init builtin LED early so OtaManager can use it for visual feedback.
+    _builtinLED.resize(kNumBuiltinLeds);
+    FastLED.addLeds<M5_INTERNAL_TYPE, kBuiltinLedPin>(_builtinLED.data(), _builtinLED.size());
+
+    _otaManager = make_unique<OtaManager>(kButtonPin, [this](CRGB color)
+    {
+        for (auto& led : _builtinLED) { led = color; }
+        FastLED.show();
+    });
+    if (_otaManager->checkBootTrigger())
+        return; // skip normal setup entirely
+
     // put your setup code here, to run once:
 
     _preferences.begin("scarfNet", false); // Namespace for non-volatile parameters
@@ -128,10 +140,6 @@ true   // DisplayEnable
              FastLED.addLeds<AMAZON, kLedPin>(_ledsReal.data(), _ledsReal.size());
             break;
     };
-
-    // tell FastLED there's 1 builtin led
-    _builtinLED.resize(kNumBuiltinLeds);
-    FastLED.addLeds<M5_INTERNAL_TYPE, kBuiltinLedPin>(_builtinLED.data(), _builtinLED.size());
 
     FastLED.setMaxPowerInMilliWatts(500);
 
@@ -258,6 +266,11 @@ void Scarf::blinkNumNodes()
             (_mesh->getNodeTimeMs() % kBlinkPeriodMs);
         _blinkNoNodes.enableDelayed(msToNextBlinkSync);
     }
+}
+
+void Scarf::otaLoop()
+{
+    _otaManager->loop();
 }
 
 } // namespace Scarfnet
