@@ -52,7 +52,7 @@ private:
     void sendMessage();
     void blinkNumNodes();
     void onConnectionChange();
-    void onReceivedData(const DynamicJsonDocument& doc);
+    void onReceivedData(const JsonDocument& doc);
 
     Mesh::TimeMs     _timeMsec {0};
     uint32_t    _syncBlinkPeriodMs{5000};

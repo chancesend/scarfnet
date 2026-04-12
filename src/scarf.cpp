@@ -31,7 +31,7 @@ Scarf::Scarf() :
                 ESP.getFreeHeap(), ESP.getMinFreeHeap());
         })
 {
-    Serial.printf("Scarf::Scarf()\n");
+    Scarfnet::log("Scarf::Scarf()\n");
 }
 
 Rnd calcRandomizer(Mesh::TimeMs timeMs)
@@ -42,7 +42,7 @@ Rnd calcRandomizer(Mesh::TimeMs timeMs)
 
 void Scarf::sendMessage()
 {
-    DynamicJsonDocument doc(1024);
+    JsonDocument doc;
     {
 //        std::lock_guard<std::mutex> lock(_mutex);
         doc["id"] = _mesh->getNodeId();
@@ -68,7 +68,7 @@ void Scarf::onConnectionChange()
     _blinkNoNodes.enableDelayed(kBlinkPeriodMs - (_mesh->getNodeTimeMs() % kBlinkPeriodMs) / 1000);
 }
 
-void Scarf::onReceivedData(const DynamicJsonDocument &doc)
+void Scarf::onReceivedData(const JsonDocument &doc)
 {
     const char *presetName = doc["pattern"];
     const Mesh::TimeMs lastRemoteButtonPressMs = doc["lastPress"];
@@ -116,14 +116,12 @@ true   // DisplayEnable
 );
 #endif
 
-    Scarfnet::PatternManager::Ptr patternManager = std::make_shared<Scarfnet::PatternManager>();
-
     _mesh = make_unique<Mesh>(kMeshSSID, kMeshPassword, &_userScheduler, kMeshPort);
     _mesh->addConnectionObserver([&]()
                                     { 
         Scarfnet::log("### addConnectionObserver() callback\n");
                                         this->onConnectionChange(); });
-    _mesh->addReceivedDataObserver([&](const DynamicJsonDocument &doc)
+    _mesh->addReceivedDataObserver([&](const JsonDocument &doc)
                                     { 
 //        Scarfnet::log("### addReceivedDataObserver() callback\n");
         this->onReceivedData(doc); });
@@ -166,7 +164,7 @@ true   // DisplayEnable
     //_blinkNoNodes.enable();
 
     randomSeed(micros());
-    Serial.printf("Scarf::setup() 2\n");
+    Scarfnet::log("Scarf::setup() done\n");
 }
 
 void Scarf::processEvent(const ObservableButton::Event &event)
