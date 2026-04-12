@@ -14,7 +14,9 @@
 
 #include <memory>
 #include <string>
-//#include <mutex>
+// No mutex needed: painlessMesh callbacks fire synchronously from within
+// mesh.update() on the same core/task as loop(), so all state access is
+// single-threaded via cooperative scheduling (TaskScheduler).
 
 namespace Scarfnet
 {
@@ -65,7 +67,6 @@ private:
     Task _taskLogMemory;
 
     uint32_t    _changeIndex {0};
- //   std::mutex  _mutex;
 
     Leds        _ledsReal;
 

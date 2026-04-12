@@ -38,7 +38,6 @@ void Scarf::sendMessage()
 {
     JsonDocument doc;
     {
-//        std::lock_guard<std::mutex> lock(_mutex);
         doc["id"] = _mesh->getNodeId();
         doc["lastPress"] = _lastSelfButtonPressMs;
         doc["pattern"] = _patternManager->getCurrentPattern();
@@ -60,6 +59,7 @@ void Scarf::onConnectionChange()
     Scarfnet::log("Scarf::onConnectionChange()\n");
     _blinkNoNodes.setIterations(_mesh->getNumNodes() * 2);
     _blinkNoNodes.enableDelayed(kBlinkPeriodMs - (_mesh->getNodeTimeMs() % kBlinkPeriodMs) / 1000);
+    _mesh->doDelayCalc();
 }
 
 void Scarf::onReceivedData(const JsonDocument &doc)
@@ -157,7 +157,6 @@ void Scarf::processEvent(const ObservableButton::Event &event)
     {
         case ObservableButton::Event::ePress:
         {
-  //          std::lock_guard<std::mutex> lock(_mutex);
             _lastSelfButtonPressMs = this->_mesh->getNodeTimeMs();
             _patternManager->incrementPattern(_lastSelfButtonPressMs);
             _changeIndex += 1;
@@ -168,7 +167,6 @@ void Scarf::processEvent(const ObservableButton::Event &event)
         }
         case ObservableButton::Event::eLongPress:
         {
-  //          std::lock_guard<std::mutex> lock(_mutex);
             _lastSelfButtonPressMs = this->_mesh->getNodeTimeMs();
             _patternManager->samePatternDifferentRandomizer(_lastSelfButtonPressMs);
             _changeIndex += 1;
@@ -180,7 +178,6 @@ void Scarf::processEvent(const ObservableButton::Event &event)
         case ObservableButton::Event::eExtraLongPress:
         {
             // Switch to the next LEDType, and save it in memory
-  //          std::lock_guard<std::mutex> lock(_mutex);
             auto ledType = _preferences.getInt(kLedTypeString, kLedType_Amazon);
             ledType = (ledType + 1) % kLedType_Count;
             _preferences.putInt(kLedTypeString, ledType);
@@ -211,10 +208,6 @@ void Scarf::loop()
     EVERY_N_MILLISECONDS(kPaletteBlendRate)
     {
         _patternManager->blendPalette();
-    }
-    const int kMeshCleanupIntervalMs = 60000;
-    EVERY_N_MILLISECONDS(kMeshCleanupIntervalMs)    {
-        _mesh->cleanupDisconnectedNodes();
     }
 }
 
