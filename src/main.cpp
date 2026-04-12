@@ -1,7 +1,7 @@
 #include "main.h"
 #include "PatternManager.h"
 #include "defines.h"
-#include "scarf.h"
+#include "Scarf.h"
 #include "Mesh.h"
 #include "log.h"
 
@@ -32,7 +32,10 @@ void loop()
 
     try
     {
-        scarf.loop();
+        if (scarf.isInOtaMode())
+            scarf.otaLoop();
+        else
+            scarf.loop();
     }
     catch (std::exception& e)
     {
