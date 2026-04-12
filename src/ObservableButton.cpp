@@ -12,7 +12,7 @@ ObservableButton::ObservableButton(Scheduler *scheduler, uint8_t buttonPin) : _s
                                                                                                     [&]()
                                                                                                     { this->checkButtonEvent(); })
 {
-    Serial.printf("ObservableButton::ObservableButton()\n");
+    Scarfnet::log("ObservableButton::ObservableButton()\n");
 }
 
 void ObservableButton::setup()
@@ -30,29 +30,29 @@ void ObservableButton::checkButtonEvent()
     if (_button.wasPressed())
     {
         _buttonState = kButtonState_Pressed;
-        Serial.printf("Button press!\n");
+        Scarfnet::log("Button press!\n");
     }
     else if (_button.pressedFor(kLongPressTimeMs) && _buttonState != kButtonState_LongPressed)
     {
         _buttonState = kButtonState_LongPressed;
-        Serial.printf("Long press!\n");
+        Scarfnet::log("Long press!\n");
         onEvent(Event::eLongPress);
     }
     else if (_button.pressedFor(kExtraLongPressTimeMs) && _buttonState != kButtonState_ExtraLongPressed)
     {
         _buttonState = kButtonState_ExtraLongPressed;
-        Serial.printf("Extra-long press!\n");
+        Scarfnet::log("Extra-long press!\n");
         onEvent(Event::eExtraLongPress);
     }
     else if (_button.wasReleased() && _buttonState == kButtonState_LongPressed)
     {
         _buttonState = kButtonState_Up;
-        Serial.printf("Button long press release!\n");
+        Scarfnet::log("Button long press release!\n");
     }
     else if (_button.wasReleased() && _buttonState == kButtonState_Pressed)
     {
         _buttonState = kButtonState_Up;
-        Serial.printf("Button short press release!\n");
+        Scarfnet::log("Button short press release!\n");
         // selectNextPattern();
         onEvent(Event::ePress);
     }

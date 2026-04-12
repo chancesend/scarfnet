@@ -27,7 +27,7 @@ class Mesh
 public:
     typedef std::shared_ptr<Mesh> Ptr;
     typedef std::function<void()> ConnectionCallback_t;
-    typedef std::function<void(const DynamicJsonDocument&)> ReceivedDataCallback_t;
+    typedef std::function<void(const JsonDocument&)> ReceivedDataCallback_t;
     typedef int32_t TimeMs;
     
     Mesh(MeshConnection connection, Scheduler* scheduler) :
@@ -43,6 +43,10 @@ public:
 
     uint32_t getMeshNodeTimeRaw();
     uint32_t getNodeTimeMs();
+
+    // Extracted for unit testing: converts a raw painlessMesh node time
+    // (microseconds, uint32_t) to a millisecond timestamp with rollover tracking.
+    static uint32_t computeNodeTimeMs(uint32_t rawNodeTime, int32_t& lastNodeTimeMs, int32_t& rolloverCount);
 
     // Cleanup method for memory management of disconnected nodes, if needed
     void cleanupDisconnectedNodes();
@@ -80,7 +84,7 @@ public:
     {
         _receivedDataObservers.push_back(observer);
     }
-    void onReceivedData(const DynamicJsonDocument& doc)
+    void onReceivedData(const JsonDocument& doc)
     {
         for(const auto& observer: _receivedDataObservers)
         {

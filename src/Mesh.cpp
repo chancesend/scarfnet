@@ -15,9 +15,9 @@ Mesh::Mesh(std::string ssid, std::string password, Scheduler *scheduler, uint16_
     _mesh.onReceive([&](uint32_t from, TSTRING &msg)
         { this->receivedCallback(from, msg); });
     _mesh.onNewConnection([&](uint32_t nodeId)
-        { 
-        Serial.printf("###NEW CONNECTION!!\n");
-            this->newConnectionCallback(nodeId); 
+        {
+            Scarfnet::log("###NEW CONNECTION!!\n");
+            this->newConnectionCallback(nodeId);
             });
     _mesh.onDroppedConnection([&](uint32_t nodeId) 
         { this->droppedConnectionCallback(nodeId); });
@@ -55,8 +55,8 @@ void Mesh::delayCalc(NodeList &nodes)
 
 void Mesh::receivedCallback(uint32_t from, String &msg)
 {
-    Serial.printf("[MESH][RCV node %u] msg=%s\n", from, msg.c_str());
-    DynamicJsonDocument doc(1024);
+    Scarfnet::log("[MESH][RCV node %u] msg=%s\n", from, msg.c_str());
+    JsonDocument doc;
     deserializeJson(doc, msg);
 
     for (const auto& observer : _receivedDataObservers)
@@ -68,8 +68,7 @@ void Mesh::receivedCallback(uint32_t from, String &msg)
 void Mesh::newConnectionCallback(uint32_t nodeId)
 {
     auto jsonLayout = _mesh.subConnectionJson(true);
-    Serial.printf("[MESH][NEW node %u] %s\n",
-                    nodeId, jsonLayout.c_str());
+    Scarfnet::log("[MESH][NEW node %u] %s\n", nodeId, jsonLayout.c_str());
 
     // Add to our local node list
     _nodes.push_back(nodeId);
@@ -81,8 +80,7 @@ void Mesh::newConnectionCallback(uint32_t nodeId)
 void Mesh::droppedConnectionCallback(uint32_t nodeId)
 {
     auto jsonLayout = _mesh.subConnectionJson(true);
-    Serial.printf("[MESH][DROP node %u] %s\n",
-                    nodeId, jsonLayout.c_str());
+    Scarfnet::log("[MESH][DROP node %u] %s\n", nodeId, jsonLayout.c_str());
 
     // Remove from our local node list
     _nodes.remove(nodeId);
@@ -93,13 +91,13 @@ void Mesh::droppedConnectionCallback(uint32_t nodeId)
 
 void Mesh::printConnectionList(NodeList &nodes)
 {
-    Serial.printf("Connection list (%d nodes):", nodes.size());
+    Scarfnet::log("Connection list (%d nodes):", nodes.size());
 
     for (auto node = nodes.begin(); node != nodes.end(); node++)
     {
-        Serial.printf(" %u", *node);
+        Scarfnet::log(" %u", *node);
     }
-    Serial.printf("\n");
+    Scarfnet::log("\n");
 }
 
 void Mesh::cleanupDisconnectedNodes()
@@ -134,7 +132,7 @@ void Mesh::cleanupDisconnectedNodes()
 
 void Mesh::changedConnectionCallback()
 {
-    Serial.printf("[MESH] Changed connections\n");
+    Scarfnet::log("[MESH] Changed connections\n");
     NodeList nodes = _mesh.getNodeList();
 
     this->printConnectionList(nodes);
@@ -148,12 +146,12 @@ void Mesh::changedConnectionCallback()
 
 void Mesh::nodeTimeAdjustedCallback(int32_t offset)
 {
-    Serial.printf("[MESH] Adjusted time %ums. Offset = %d\n", this->getNodeTimeMs(), offset);
+    Scarfnet::log("[MESH] Adjusted time %ums. Offset = %d\n", this->getNodeTimeMs(), offset);
 }
 
 void Mesh::delayReceivedCallback(uint32_t from, int32_t delay)
 {
-    Serial.printf("[MESH] Delay to node %u is %d us\n", from, delay);
+    Scarfnet::log("[MESH] Delay to node %u is %d us\n", from, delay);
 }
 
 uint32_t Mesh::getMeshNodeTimeRaw()
@@ -161,18 +159,23 @@ uint32_t Mesh::getMeshNodeTimeRaw()
     return _mesh.getNodeTime();
 }
 
+/*static*/ uint32_t Mesh::computeNodeTimeMs(uint32_t rawNodeTime, int32_t& lastNodeTimeMs, int32_t& rolloverCount)
+{
+    const uint32_t kShift = 10; // divide microseconds by 1024 ≈ milliseconds
+    const int32_t nodeTimeMs = (int32_t)(rawNodeTime >> kShift);
+    const int32_t kRolloverThresholdMs = 1000 * 1000;
+    if (nodeTimeMs - lastNodeTimeMs < -kRolloverThresholdMs)
+    {
+        rolloverCount++;
+        Scarfnet::log("getNodeTime() rollover!\n");
+    }
+    lastNodeTimeMs = nodeTimeMs;
+    return ((uint32_t)nodeTimeMs & 0x003fffffu) | (((uint32_t)rolloverCount << (32u - kShift)) & 0xffc00000u);
+}
+
 uint32_t Mesh::getNodeTimeMs()
 {
-    const uint32_t k1024_Exp = 10;
-    const int32_t nodeTimeMs = _mesh.getNodeTime() >> k1024_Exp;
-    const int32_t kRolloverThresholdMs = 1000 * 1000;
-    if (nodeTimeMs - _lastNodeTimeMs < -kRolloverThresholdMs)
-    {
-        _rolloverCount++;
-        Serial.printf("getNodeTime() rollover!\n");
-    }
-    _lastNodeTimeMs = nodeTimeMs;
-    return (nodeTimeMs & 0x003fffff | ((TimeMs)_rolloverCount << (32 - k1024_Exp)) & 0xffc00000);
+    return computeNodeTimeMs(_mesh.getNodeTime(), _lastNodeTimeMs, _rolloverCount);
 }
 
 } // namespace Scarfnet
