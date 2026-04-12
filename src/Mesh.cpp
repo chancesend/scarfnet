@@ -27,7 +27,7 @@ Mesh::Mesh(std::string ssid, std::string password, Scheduler *scheduler, uint16_
         { this->nodeTimeAdjustedCallback(offset); });
     _mesh.onNodeDelayReceived([&](uint32_t nodeId, int32_t delay)
         { this->delayReceivedCallback(nodeId, delay); });
-    Serial.printf("Mesh::Mesh\n");
+    Scarfnet::log("Mesh::Mesh\n");
 }
 
 void Mesh::update()

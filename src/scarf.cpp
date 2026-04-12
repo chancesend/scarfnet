@@ -52,12 +52,12 @@ void Scarf::sendMessage()
     _mesh->sendBroadcast(outJson);
 
     _mesh->doDelayCalc();
-    Serial.printf("[SND] %s\n", outJson.c_str());
+    Scarfnet::log("[SND] %s\n", outJson.c_str());
 }
 
 void Scarf::onConnectionChange()
 {
-    Serial.printf("Scarf::onConnectionChange()\n");
+    Scarfnet::log("Scarf::onConnectionChange()\n");
     _blinkNoNodes.setIterations(_mesh->getNumNodes() * 2);
     _blinkNoNodes.enableDelayed(kBlinkPeriodMs - (_mesh->getNodeTimeMs() % kBlinkPeriodMs) / 1000);
 }
@@ -76,14 +76,14 @@ void Scarf::onReceivedData(const JsonDocument &doc)
         _changeIndex = changeIndex > 0x7fffffff ? 0 : changeIndex;
         _lastSelfButtonPressMs = lastRemoteButtonPressMs > 0x7fffffff ? 0 : lastRemoteButtonPressMs;
 
-        Serial.printf("Scarf::onReceivedData(). Changing pattern to %s (randomizer %i)\n", presetName, randomizer);
+        Scarfnet::log("Scarf::onReceivedData(). Changing pattern to %s (randomizer %i)\n", presetName, randomizer);
         _patternManager->changePatternFromString(presetName, randomizer);
     }
 }
 
 void Scarf::setup()
 {
-    Serial.printf("Scarf::setup()\n");
+    Scarfnet::log("Scarf::setup()\n");
     // put your setup code here, to run once:
 
     _preferences.begin("scarfNet", false); // Namespace for non-volatile parameters
