@@ -28,6 +28,11 @@ Mesh::Mesh(std::string ssid, std::string password, Scheduler *scheduler, uint16_
     Serial.printf("Mesh::Mesh\n");
 }
 
+void Mesh::update()
+{
+    _mesh.update();
+}
+
 void Mesh::delayCalc(NodeList &nodes) 
 {
     if (_calcDelay)
@@ -63,6 +68,12 @@ void Mesh::newConnectionCallback(uint32_t nodeId)
     auto jsonLayout = _mesh.subConnectionJson(true);
     Serial.printf("[MESH][NEW node %u] %s\n",
                     nodeId, jsonLayout.c_str());
+
+    // Add to our local node list
+    _nodes.push_back(nodeId);
+    
+    // Trigger connection change notification
+    onConnectionChange();
 }
 
 void Mesh::droppedConnectionCallback(uint32_t nodeId)
@@ -70,6 +81,12 @@ void Mesh::droppedConnectionCallback(uint32_t nodeId)
     auto jsonLayout = _mesh.subConnectionJson(true);
     Serial.printf("[MESH][DROP node %u] %s\n",
                     nodeId, jsonLayout.c_str());
+
+    // Remove from our local node list
+    _nodes.remove(nodeId);
+    
+    // Trigger connection change notification
+    onConnectionChange();
 }
 
 void Mesh::printConnectionList(NodeList &nodes)
@@ -81,6 +98,36 @@ void Mesh::printConnectionList(NodeList &nodes)
         Serial.printf(" %u", *node);
     }
     Serial.printf("\n");
+}
+
+void Mesh::cleanupDisconnectedNodes()
+{
+    TimeMs currentTime = millis();
+    if (currentTime - _lastCleanupTime < CLEANUP_INTERVAL_MS) {
+        return; // Don't cleanup too frequently
+    }
+    
+    _lastCleanupTime = currentTime;
+    
+    // Get current mesh node list
+    auto meshNodes = _mesh.getNodeList();
+    
+    // Create a set of current active node IDs for fast lookup
+    std::unordered_set<uint32_t> activeNodes;
+    for (auto nodeId : meshNodes) {
+        activeNodes.insert(nodeId);
+    }
+    
+    // Remove nodes that are no longer in the mesh
+    NodeList::iterator it = _nodes.begin();
+    while (it != _nodes.end()) {
+        if (activeNodes.find(*it) == activeNodes.end()) {
+            // Node is no longer connected, remove it
+            it = _nodes.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 void Mesh::changedConnectionCallback()

@@ -25,6 +25,7 @@ public:
             eLongPress,
             eDoublePress,
             eRelease,
+            eExtraLongPress,
         };
     typedef std::function<void(const Event&)> EventCallback_t;
 
@@ -34,6 +35,7 @@ public:
         kButtonState_Pressed,
         kButtonState_LongPressed,
         kButtonState_DoublePressed,
+        kButtonState_ExtraLongPressed,
     };
 
     ObservableButton(Scheduler* scheduler, uint8_t buttonPin);

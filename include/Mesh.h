@@ -8,6 +8,7 @@
 #include <memory>
 #include <functional>
 #include <stdint.h>
+#include <list>
 
 #include "log.h"
 
@@ -36,11 +37,15 @@ public:
 
     Mesh(std::string ssid, std::string password, Scheduler* scheduler, uint16_t port);
 
-    void update() { return _mesh.update(); };
+    void update();
+
     uint32_t getNodeId() { return _mesh.getNodeId(); };
 
     uint32_t getMeshNodeTimeRaw();
     uint32_t getNodeTimeMs();
+
+    // Cleanup method for memory management of disconnected nodes, if needed
+    void cleanupDisconnectedNodes();
 
     int getNumNodes()
     {
@@ -84,7 +89,7 @@ public:
     }
 
 private:
-    typedef SimpleList<uint32_t> NodeList;
+    typedef std::list<uint32_t> NodeList;
     NodeList _nodes;
 
     void receivedCallback(uint32_t from, String & msg);
@@ -104,8 +109,14 @@ private:
     
     typedef std::vector<ConnectionCallback_t> ConnectionObserverList;
     ConnectionObserverList _connectionObservers;
+        // 3. Consider weak pointers for observers to prevent memory leaks
+    typedef std::vector<std::weak_ptr<ConnectionCallback_t>> WeakConnectionObserverList;
+    
     typedef std::vector<ReceivedDataCallback_t> ReceivedDataObserverList;
     ReceivedDataObserverList _receivedDataObservers;
+
+    TimeMs _lastCleanupTime {0};
+    static constexpr TimeMs CLEANUP_INTERVAL_MS = 60000;
 };
 
 }
