@@ -8,7 +8,6 @@
 #include <memory>
 #include <functional>
 #include <stdint.h>
-#include <list>
 
 #include "log.h"
 
@@ -48,9 +47,6 @@ public:
     // (microseconds, uint32_t) to a millisecond timestamp with rollover tracking.
     static uint32_t computeNodeTimeMs(uint32_t rawNodeTime, int32_t& lastNodeTimeMs, int32_t& rolloverCount);
 
-    // Cleanup method for memory management of disconnected nodes, if needed
-    void cleanupDisconnectedNodes();
-
     int getNumNodes()
     {
         return (_mesh.getNodeList().size() + 1);
@@ -62,8 +58,8 @@ public:
     };
 
     void doDelayCalc()
-    { 
-        delayCalc(_nodes); 
+    {
+        delayCalc();
     }
     
     void addConnectionObserver(const ConnectionCallback_t& observer)
@@ -93,32 +89,26 @@ public:
     }
 
 private:
-    typedef std::list<uint32_t> NodeList;
-    NodeList _nodes;
-
     void receivedCallback(uint32_t from, String & msg);
     void newConnectionCallback(uint32_t nodeId);
     void droppedConnectionCallback(uint32_t nodeId);
-    void changedConnectionCallback(); 
-    void nodeTimeAdjustedCallback(int32_t offset); 
+    void changedConnectionCallback();
+    void nodeTimeAdjustedCallback(int32_t offset);
     void delayReceivedCallback(uint32_t from, int32_t delay);
 
-    void delayCalc(NodeList& nodes);
-    void printConnectionList(NodeList& nodes);
+    void delayCalc();
+    void printConnectionList();
 
     bool _calcDelay {false};
     painlessmesh::wifi::Mesh    _mesh;
     TimeMs   _lastNodeTimeMs {0};
     int32_t     _rolloverCount {0};
-    
+
     typedef std::vector<ConnectionCallback_t> ConnectionObserverList;
     ConnectionObserverList _connectionObservers;
 
     typedef std::vector<ReceivedDataCallback_t> ReceivedDataObserverList;
     ReceivedDataObserverList _receivedDataObservers;
-
-    TimeMs _lastCleanupTime {0};
-    static constexpr TimeMs CLEANUP_INTERVAL_MS = 60000;
 };
 
 }

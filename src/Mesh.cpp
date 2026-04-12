@@ -1,8 +1,6 @@
 #include "Mesh.h"
 #include "log.h"
 
-#include <unordered_set>
-
 namespace Scarfnet
 {
 
@@ -35,29 +33,29 @@ void Mesh::update()
     _mesh.update();
 }
 
-void Mesh::delayCalc(NodeList &nodes) 
+void Mesh::delayCalc()
 {
     if (_calcDelay)
     {
-        for (auto node = nodes.begin(); node != nodes.end(); node++)
+        auto nodes = _mesh.getNodeList();
+        for (auto node : nodes)
         {
-            auto isNodeIdConnected = _mesh.startDelayMeas(*node);
+            _mesh.startDelayMeas(node);
         }
         _calcDelay = false;
     }
 }
 
-// TODO: Need to parse the received message
-// for some data:
-//  - Last button pressed
-//  - Name of current pattern
-// Then pass data to Scarf so it can compute correct pattern
-
 void Mesh::receivedCallback(uint32_t from, String &msg)
 {
     Scarfnet::log("[MESH][RCV node %u] msg=%s\n", from, msg.c_str());
     JsonDocument doc;
-    deserializeJson(doc, msg);
+    auto err = deserializeJson(doc, msg);
+    if (err)
+    {
+        Scarfnet::log("[MESH][RCV] JSON parse error: %s\n", err.c_str());
+        return;
+    }
 
     for (const auto& observer : _receivedDataObservers)
     {
@@ -69,73 +67,31 @@ void Mesh::newConnectionCallback(uint32_t nodeId)
 {
     auto jsonLayout = _mesh.subConnectionJson(true);
     Scarfnet::log("[MESH][NEW node %u] %s\n", nodeId, jsonLayout.c_str());
-
-    // Add to our local node list
-    _nodes.push_back(nodeId);
-    
-    // Trigger connection change notification
-    onConnectionChange();
+    // changedConnectionCallback fires immediately after and notifies observers
 }
 
 void Mesh::droppedConnectionCallback(uint32_t nodeId)
 {
     auto jsonLayout = _mesh.subConnectionJson(true);
     Scarfnet::log("[MESH][DROP node %u] %s\n", nodeId, jsonLayout.c_str());
-
-    // Remove from our local node list
-    _nodes.remove(nodeId);
-    
-    // Trigger connection change notification
-    onConnectionChange();
+    // changedConnectionCallback fires immediately after and notifies observers
 }
 
-void Mesh::printConnectionList(NodeList &nodes)
+void Mesh::printConnectionList()
 {
+    auto nodes = _mesh.getNodeList();
     Scarfnet::log("Connection list (%d nodes):", nodes.size());
-
-    for (auto node = nodes.begin(); node != nodes.end(); node++)
+    for (auto node : nodes)
     {
-        Scarfnet::log(" %u", *node);
+        Scarfnet::log(" %u", node);
     }
     Scarfnet::log("\n");
-}
-
-void Mesh::cleanupDisconnectedNodes()
-{
-    TimeMs currentTime = millis();
-    if (currentTime - _lastCleanupTime < CLEANUP_INTERVAL_MS) {
-        return; // Don't cleanup too frequently
-    }
-    
-    _lastCleanupTime = currentTime;
-    
-    // Get current mesh node list
-    auto meshNodes = _mesh.getNodeList();
-    
-    // Create a set of current active node IDs for fast lookup
-    std::unordered_set<uint32_t> activeNodes;
-    for (auto nodeId : meshNodes) {
-        activeNodes.insert(nodeId);
-    }
-    
-    // Remove nodes that are no longer in the mesh
-    NodeList::iterator it = _nodes.begin();
-    while (it != _nodes.end()) {
-        if (activeNodes.find(*it) == activeNodes.end()) {
-            // Node is no longer connected, remove it
-            it = _nodes.erase(it);
-        } else {
-            ++it;
-        }
-    }
 }
 
 void Mesh::changedConnectionCallback()
 {
     Scarfnet::log("[MESH] Changed connections\n");
-    NodeList nodes = _mesh.getNodeList();
-
-    this->printConnectionList(nodes);
+    this->printConnectionList();
     _calcDelay = true;
 
     for (const auto& observer : _connectionObservers)
