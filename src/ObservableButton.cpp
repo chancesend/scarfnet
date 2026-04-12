@@ -40,7 +40,7 @@ void ObservableButton::checkButtonEvent()
     }
     else if (_button.pressedFor(kExtraLongPressTimeMs) && _buttonState != kButtonState_ExtraLongPressed)
     {
-        _buttonState = kButtonState_LongPressed;
+        _buttonState = kButtonState_ExtraLongPressed;
         Serial.printf("Extra-long press!\n");
         onEvent(Event::eExtraLongPress);
     }

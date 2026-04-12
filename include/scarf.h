@@ -68,6 +68,7 @@ private:
     Task _taskSendMessage; // start with a one second interval
     // Task to blink the number of nodes
     Task _blinkNoNodes;
+    Task _taskLogMemory;
 
     uint32_t    _changeIndex {0};
  //   std::mutex  _mutex;

@@ -1,6 +1,8 @@
 #include "Mesh.h"
 #include "log.h"
 
+#include <unordered_set>
+
 namespace Scarfnet
 {
 

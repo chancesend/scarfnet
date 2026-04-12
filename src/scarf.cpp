@@ -23,7 +23,13 @@ Scarf::Scarf() :
         { _patternManager->currentPatternRun(); }),
     _taskSendMessage(TASK_SECOND * 3, TASK_FOREVER,
         [this]()
-        { sendMessage(); })
+        { sendMessage(); }),
+    _taskLogMemory(TASK_MINUTE, TASK_FOREVER,
+        [this]()
+        {
+            Scarfnet::log("[MEM] free: %u  min-free: %u\n",
+                ESP.getFreeHeap(), ESP.getMinFreeHeap());
+        })
 {
     Serial.printf("Scarf::Scarf()\n");
 }
@@ -145,6 +151,9 @@ true   // DisplayEnable
 
     _userScheduler.addTask(_taskSendMessage);
     _taskSendMessage.enable();
+
+    _userScheduler.addTask(_taskLogMemory);
+    _taskLogMemory.enable();
 
     _userScheduler.addTask(_taskCurrentPatternRun);
     // TODO: enable this task?
