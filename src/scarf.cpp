@@ -11,16 +11,11 @@
 namespace Scarfnet
 {
 
-// default scheduling time for currentPatternSELECT, in milliseconds
-const int kCurrentPatternSelectDefaultInterval = 1;
 static const char* const kLedTypeString = "ledType";
 
 Scarf::Scarf() :
     _patternManager(std::make_shared<Scarfnet::PatternManager>()),
     _nextPatternButton(&_userScheduler, kButtonPin),
-    _taskCurrentPatternRun(kCurrentPatternSelectDefaultInterval, TASK_FOREVER,
-        [this]()
-        { _patternManager->currentPatternRun(); }),
     _taskSendMessage(TASK_SECOND * 3, TASK_FOREVER,
         [this]()
         { sendMessage(); }),
@@ -36,8 +31,7 @@ Scarf::Scarf() :
 
 Rnd calcRandomizer(Mesh::TimeMs timeMs)
 {
-    Rnd randomizer = (Rnd)timeMs & (~((Rnd)0));
-    return randomizer;
+    return (Rnd)timeMs;
 }
 
 void Scarf::sendMessage()
@@ -72,19 +66,14 @@ void Scarf::onReceivedData(const JsonDocument &doc)
 {
     const char *presetName = doc["pattern"];
     const Mesh::TimeMs lastRemoteButtonPressMs = doc["lastPress"];
-    const int nodeId = doc["id"];
     const Rnd randomizer = doc["randomizer"];
     const uint32_t changeIndex = doc["changeIndex"];
-    const bool isNewRemotePress = (changeIndex > _changeIndex) || (lastRemoteButtonPressMs > _lastAnyRemotePressMs);
-    if (isNewRemotePress)
+    if (changeIndex > _changeIndex)
     {
-        // These are all sensitive to rollover 
+        // changeIndex and lastPress are sensitive to rollover
         // (though not for several days or millions of presses).
-        // So in an effort to control rollover the fields, we compare them
-        // to max and force-roll them if they are too big. This should hopefully
-        // make sure we're not locked up from future button presses when rolling over
+        // Cap at 0x7fffffff to force-roll before overflow locks us out.
         _changeIndex = changeIndex > 0x7fffffff ? 0 : changeIndex;
-        _lastAnyRemotePressMs = lastRemoteButtonPressMs > 0x7fffffff ? 0 : lastRemoteButtonPressMs;
         _lastSelfButtonPressMs = lastRemoteButtonPressMs > 0x7fffffff ? 0 : lastRemoteButtonPressMs;
 
         Serial.printf("Scarf::onReceivedData(). Changing pattern to %s (randomizer %i)\n", presetName, randomizer);
@@ -130,7 +119,6 @@ true   // DisplayEnable
     _nextPatternButton.addObserver([&](const ObservableButton::Event &event)
                                     { this->processEvent(event); });
 
-    _leds.resize(kNumLeds);
     _ledsReal.resize(kNumLeds);
     switch (ledType) {
         case kLedType_Adafruit:
@@ -152,10 +140,6 @@ true   // DisplayEnable
 
     _userScheduler.addTask(_taskLogMemory);
     _taskLogMemory.enable();
-
-    _userScheduler.addTask(_taskCurrentPatternRun);
-    // TODO: enable this task?
-    // _taskCurrrentPatternRun.enable();
 
     _blinkNoNodes.set(kBlinkPeriodMs, _mesh->getNumNodes() * 2,
                         [&]()
@@ -234,9 +218,6 @@ void Scarf::loop()
     }
 }
 
-void Scarf::watchdog()
-{
-}
 
 void Scarf::updateTime()
 {
@@ -264,12 +245,7 @@ void Scarf::showBuiltInLED()
 // Generate the animation every N ms
 void Scarf::showLEDs()
 {
-    _patternManager->runCurrentPattern(_leds, _mesh->getNodeTimeMs());
-
-    for (int i = 0; i < _leds.size(); i++)
-    {
-        _ledsReal[i] = _leds[i];
-    }
+    _patternManager->runCurrentPattern(_ledsReal, _mesh->getNodeTimeMs());
 }
 
 void Scarf::blinkNumNodes()

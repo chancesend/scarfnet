@@ -23,8 +23,6 @@ public:
     void samePatternDifferentRandomizer(Mesh::TimeMs lastSelfPressMs);
     void changePatternFromString(const std::string& pattern, Rnd randomizer);
 
-    void currentPatternRun();
-
     void blendPalette();
 
 private:
