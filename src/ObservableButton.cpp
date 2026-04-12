@@ -24,6 +24,7 @@ void ObservableButton::setup()
 void ObservableButton::checkButtonEvent()
 {
     const int32_t kLongPressTimeMs = 1000;
+    const int32_t kExtraLongPressTimeMs = 7000;
     const auto instantState = _button.read();
 
     if (_button.wasPressed())
@@ -36,6 +37,12 @@ void ObservableButton::checkButtonEvent()
         _buttonState = kButtonState_LongPressed;
         Serial.printf("Long press!\n");
         onEvent(Event::eLongPress);
+    }
+    else if (_button.pressedFor(kExtraLongPressTimeMs) && _buttonState != kButtonState_ExtraLongPressed)
+    {
+        _buttonState = kButtonState_LongPressed;
+        Serial.printf("Extra-long press!\n");
+        onEvent(Event::eExtraLongPress);
     }
     else if (_button.wasReleased() && _buttonState == kButtonState_LongPressed)
     {

@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include "unity_config.h"
 
-void unityOutputStart() {}
+void unityOutputStart(unsigned long a) {}
 
-void unityOutputChar(char c) {
+void unityOutputChar(unsigned int c) {
     printf("%c", c);
 }
 

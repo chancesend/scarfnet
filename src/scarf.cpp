@@ -13,6 +13,7 @@ namespace Scarfnet
 
 // default scheduling time for currentPatternSELECT, in milliseconds
 const int kCurrentPatternSelectDefaultInterval = 1;
+static const char* const kLedTypeString = "ledType";
 
 Scarf::Scarf() :
     _patternManager(std::make_shared<Scarfnet::PatternManager>()),
@@ -90,6 +91,17 @@ void Scarf::setup()
     Serial.printf("Scarf::setup()\n");
     // put your setup code here, to run once:
 
+    _preferences.begin("scarfNet", false); // Namespace for non-volatile parameters
+    bool isLedTypeSet = _preferences.isKey(kLedTypeString);
+    if (!isLedTypeSet) {
+        _preferences.putInt(kLedTypeString, kLedType_Amazon);
+        Scarfnet::log("LED type not set in preferences. Setting to default %i\n", kLedType_Amazon);
+    } else {
+        Scarfnet::log("LED type already set in preferences\n");
+    }
+    int ledType = _preferences.getInt(kLedTypeString, kLedType_Amazon);
+    Scarfnet::log("Loading LED type %i from preferences(%s)\n", ledType, kLedTypeString);
+
 #if 0
 M5.begin(
 true,  // SerialEnable
@@ -116,7 +128,14 @@ true   // DisplayEnable
 
     _leds.resize(kNumLeds);
     _ledsReal.resize(kNumLeds);
-    FastLED.addLeds<LED_TYPE, kLedPin>(_ledsReal.data(), _ledsReal.size());
+    switch (ledType) {
+        case kLedType_Adafruit:
+             FastLED.addLeds<ADAFRUIT, kLedPin>(_ledsReal.data(), _ledsReal.size());
+             break;
+        case kLedType_Amazon:
+             FastLED.addLeds<AMAZON, kLedPin>(_ledsReal.data(), _ledsReal.size());
+            break;
+    };
 
     // tell FastLED there's 1 builtin led
     _builtinLED.resize(kNumBuiltinLeds);
@@ -152,6 +171,8 @@ void Scarf::processEvent(const ObservableButton::Event &event)
             _patternManager->incrementPattern(_lastSelfButtonPressMs);
             _changeIndex += 1;
             _taskSendMessage.forceNextIteration();
+            Scarfnet::log("Event.ePress to pattern %s with randomizer %i (changeIndex: %i)\n", 
+                _patternManager->getCurrentPattern().c_str(), calcRandomizer(_lastSelfButtonPressMs), _changeIndex);
             break;
         }
         case ObservableButton::Event::eLongPress:
@@ -161,6 +182,20 @@ void Scarf::processEvent(const ObservableButton::Event &event)
             _patternManager->samePatternDifferentRandomizer(_lastSelfButtonPressMs);
             _changeIndex += 1;
             _taskSendMessage.forceNextIteration();
+            Scarfnet::log("Event.eLongPress to pattern %s with randomizer %i (changeIndex: %i)\n", 
+                _patternManager->getCurrentPattern().c_str(), calcRandomizer(_lastSelfButtonPressMs), _changeIndex);
+            break;
+        }
+        case ObservableButton::Event::eExtraLongPress:
+        {
+            // Switch to the next LEDType, and save it in memory
+  //          std::lock_guard<std::mutex> lock(_mutex);
+            auto ledType = _preferences.getInt(kLedTypeString, kLedType_Amazon);
+            ledType = (ledType + 1) % kLedType_Count;
+            _preferences.putInt(kLedTypeString, ledType);
+            Scarfnet::log("Event.eExtraLongPress. Changing LED type to %i and restarting\n", ledType);
+            delay(1000);
+            ESP.restart();
             break;
         }
     }
@@ -181,14 +216,14 @@ void Scarf::loop()
         showBuiltInLED();
         FastLED.show();
     }
-    const int kWatchdogMs = 5000;
-    EVERY_N_MILLISECONDS(kWatchdogMs)
-    {
-        watchdog();
-    }
-    EVERY_N_MILLISECONDS(40)
+    const int kPaletteBlendRate = 40;
+    EVERY_N_MILLISECONDS(kPaletteBlendRate)
     {
         _patternManager->blendPalette();
+    }
+    const int kMeshCleanupIntervalMs = 60000;
+    EVERY_N_MILLISECONDS(kMeshCleanupIntervalMs)    {
+        _mesh->cleanupDisconnectedNodes();
     }
 }
 
@@ -203,13 +238,10 @@ void Scarf::updateTime()
 
 void Scarf::showBuiltInLED()
 {
-    auto color = _onFlag ? CRGB::Blue : CRGB::Black;
     auto syncColor = CRGB::Red;
     for (int i = 0; i < _builtinLED.size(); ++i)
     {
         _builtinLED[i] = CRGB::Black;
-        // Every few second or we blink how many nodes are connected
-        //        _builtinLED[i] = color;
 
         // We also do a sync blink every few seconds
         float floatTime = _timeMsec / (float)_syncBlinkPeriodMs;
@@ -247,7 +279,7 @@ void Scarf::blinkNumNodes()
         // Calculate delay based on current mesh time and kBlinkPeriodMs
         // This results in blinks between nodes being synced
         auto msToNextBlinkSync = kBlinkPeriodMs -
-                                    (_mesh->getNodeTimeMs() % kBlinkPeriodMs);
+            (_mesh->getNodeTimeMs() % kBlinkPeriodMs);
         _blinkNoNodes.enableDelayed(msToNextBlinkSync);
     }
 }
