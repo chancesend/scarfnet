@@ -43,11 +43,7 @@ private:
     void showLEDs();
     void showBuiltInLED();
     void updateTime();
-    void initMesh();
-    void watchdog();
     void processEvent(const ObservableButton::Event &event);
-    
-    int  getNumNodes();
 
     void sendMessage();
     void blinkNumNodes();
@@ -59,13 +55,11 @@ private:
     
     ObservableButton      _nextPatternButton;
     Mesh::TimeMs _lastSelfButtonPressMs {0};
-    Mesh::TimeMs _lastAnyRemotePressMs {0};
     bool        _onFlag {false};
 
     Preferences _preferences;
     
-    Task _taskCurrentPatternRun;
-    Task _taskSendMessage; // start with a one second interval
+    Task _taskSendMessage;
     // Task to blink the number of nodes
     Task _blinkNoNodes;
     Task _taskLogMemory;
@@ -73,7 +67,6 @@ private:
     uint32_t    _changeIndex {0};
  //   std::mutex  _mutex;
 
-    Leds        _leds;
     Leds        _ledsReal;
 
     Leds        _builtinLED;

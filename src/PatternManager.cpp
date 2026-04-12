@@ -37,10 +37,6 @@ void PatternManager::initPatterns()
     _currentPattern = _patterns.begin();
 }
 
-void PatternManager::currentPatternRun()
-{
-}
-
 void PatternManager::incrementPattern(Mesh::TimeMs lastSelfPressMs)
 {
     auto newPattern = _currentPattern + 1;

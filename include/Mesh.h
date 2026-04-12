@@ -68,7 +68,7 @@ public:
     
     void addConnectionObserver(const ConnectionCallback_t& observer)
     {
-        Scarfnet::log("### addConnectionObserver()\n");
+        Scarfnet::log("### registering connection observer\n");
         _connectionObservers.push_back(observer);
     }
     void onConnectionChange()
@@ -113,9 +113,7 @@ private:
     
     typedef std::vector<ConnectionCallback_t> ConnectionObserverList;
     ConnectionObserverList _connectionObservers;
-        // 3. Consider weak pointers for observers to prevent memory leaks
-    typedef std::vector<std::weak_ptr<ConnectionCallback_t>> WeakConnectionObserverList;
-    
+
     typedef std::vector<ReceivedDataCallback_t> ReceivedDataObserverList;
     ReceivedDataObserverList _receivedDataObservers;
 
