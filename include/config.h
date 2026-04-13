@@ -13,7 +13,7 @@ const int kLedRefreshRateMs               = 15;
 const int kPaletteBlendRateMs             = 40;
 
 // ── Scarf: heartbeat & blink ─────────────────────────────────────────────────
-const uint32_t kHeartbeatIntervalMs       = 3000;
+const uint32_t kHeartbeatIntervalMs       = 5000;
 const uint32_t kMemLogIntervalMs          = 60000;
 const int kNodeBlinkPeriodMs              = 3000;
 const uint32_t kSyncBlinkPeriodMs         = 5000;
@@ -24,10 +24,6 @@ const uint32_t kSyncBlinkPeriodMs         = 5000;
 const uint32_t kBurstSyncIntervalMs       = 500;
 const int      kBurstSyncCount            = 3;
 
-// ── Scarf: follow-up heartbeat after pattern change ──────────────────────────
-// A second heartbeat kFollowUpHeartbeatMs after a button press ensures nodes
-// that missed the first broadcast pick up the new pattern quickly.
-const uint32_t kFollowUpHeartbeatMs       = 100;
 
 // ── OTA ──────────────────────────────────────────────────────────────────────
 const int      kOtaHoldMs                 = 10000; // hold time for boot trigger or server-mode entry

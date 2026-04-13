@@ -26,6 +26,11 @@
 - [ ] Add a couple of modes that attempt to do "swarming" logic by taking into account time-of-arrival delays between scarves, so that the LED patterns are not all the same (they are either offset in time, or do slightly different patterns for interesting visual effects)
 - 
 
+## Investigations
+
+- [ ] See what stability we see regarding time deltas between scarves - do they drift with space? What sort of clock jitter do we have?
+- [ ] What sort of network traffic are we dealing with, relative to what is being sent? How does this scale with the number of scarves? Is there a point at which we will start seeing problems? I currently have 16 scarves that could be active at any one time - how large could this scale?
+
 ## Unit Tests
 
 - [x] Test `Scarf::onReceivedData` sync logic — extract `changeIndex`/rollover acceptance logic into a testable free function or struct (currently private and hardware-coupled)

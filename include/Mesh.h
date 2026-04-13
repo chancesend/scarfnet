@@ -5,6 +5,7 @@
 #include <ArduinoJson.h>
 
 #include <vector>
+#include <map>
 #include <memory>
 #include <functional>
 #include <stdint.h>
@@ -63,6 +64,13 @@ public:
         return _mesh.sendBroadcast(msg, includeSelf);
     };
 
+    // Records the one-way arrival delta (receiverTimeMs - senderTimeMs) for a
+    // node and updates its EMA-smoothed estimate. Called on every heartbeat.
+    void recordArrivalDelta(uint32_t nodeId, int32_t rawDeltaMs);
+
+    // Returns the EMA-smoothed arrival delta for a node, or 0 if unknown.
+    int32_t getArrivalDelta(uint32_t nodeId) const;
+
     // Triggers a one-shot delay calculation to estimate link latency.
     void doDelayCalc()
     {
@@ -112,6 +120,10 @@ private:
     painlessmesh::wifi::Mesh    _mesh;
     TimeMs   _lastNodeTimeMs {0};
     int32_t     _rolloverCount {0};
+
+    // EMA-smoothed one-way arrival delta per peer node (ms). Populated by
+    // recordArrivalDelta() and used to estimate "network distance" for swarm patterns.
+    std::map<uint32_t, int32_t> _nodeArrivalDeltas;
 
     typedef std::vector<ConnectionCallback_t> ConnectionObserverList;
     ConnectionObserverList _connectionObservers;
