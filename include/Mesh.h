@@ -64,12 +64,12 @@ public:
     
     void addConnectionObserver(const ConnectionCallback_t& observer)
     {
-        Scarfnet::log("### registering connection observer\n");
+        Scarfnet::log("[MESH] registering connection observer\n");
         _connectionObservers.push_back(observer);
     }
     void onConnectionChange()
     {
-        Scarfnet::log("### onConnectionChange()\n");
+        Scarfnet::log("[MESH] onConnectionChange()\n");
         for(const auto& observer: _connectionObservers)
         {
             observer();

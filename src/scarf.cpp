@@ -120,7 +120,7 @@ true   // DisplayEnable
     _mesh = make_unique<Mesh>(kMeshSSID, kMeshPassword, &_userScheduler, kMeshPort);
     _mesh->addConnectionObserver([&]()
                                     { 
-        Scarfnet::log("### addConnectionObserver() callback\n");
+        Scarfnet::log("[MESH] addConnectionObserver() callback\n");
                                         this->onConnectionChange(); });
     _mesh->addReceivedDataObserver([&](const JsonDocument &doc)
                                     { 
