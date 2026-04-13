@@ -73,6 +73,11 @@ private:
     // Task to blink the number of nodes
     Task _blinkNoNodes;
     Task _taskLogMemory;
+    // Fires kBurstSyncCount times at kBurstSyncIntervalMs after a connection change.
+    Task _taskBurstSync;
+    // Fires once kFollowUpHeartbeatMs after a button press to catch any nodes
+    // that missed the immediate broadcast.
+    Task _taskFollowUpHeartbeat;
 
     uint32_t    _changeIndex {0};
 

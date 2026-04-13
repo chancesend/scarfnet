@@ -12,12 +12,12 @@
 
 ## Architecture / Reliability
 
-- [ ] Investigate edge cases: Scarves having been running for a very long time, lots of scarves in the network, really bad network conditions, etc
+- [x] Investigate edge cases: Scarves having been running for a very long time, lots of scarves in the network, really bad network conditions, etc
 
 ## Time Sync Tuning
 
-- [ ] Temporarily shorten heartbeat interval after a connection event to give painlessMesh more data points for time sync convergence, then restore the normal 3-second interval (e.g. 500ms for ~10 seconds after `onConnectionChange`)
-- [ ] See if it helps to send out an extra sync packet after a scarf sends out a new pattern or palette
+- [x] Temporarily shorten heartbeat interval after a connection event to give painlessMesh more data points for time sync convergence, then restore the normal 3-second interval (e.g. 500ms for ~10 seconds after `onConnectionChange`)
+- [x] See if it helps to send out an extra sync packet after a scarf sends out a new pattern or palette
 
 ## Future Work
 
@@ -28,5 +28,5 @@
 
 ## Unit Tests
 
-- [ ] Test `Scarf::onReceivedData` sync logic — extract `changeIndex`/rollover acceptance logic into a testable free function or struct (currently private and hardware-coupled)
+- [x] Test `Scarf::onReceivedData` sync logic — extract `changeIndex`/rollover acceptance logic into a testable free function or struct (currently private and hardware-coupled)
 - [ ] Add tests for `ObservableButton` state machine — press → long press → extra-long press transition sequence
