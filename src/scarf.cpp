@@ -28,10 +28,9 @@ Scarf::Scarf() :
         }),
     _taskBurstSync(kBurstSyncIntervalMs, TASK_ONCE,
         [this]()
-        { sendMessage(); }),
-    _taskFollowUpHeartbeat(kFollowUpHeartbeatMs, TASK_ONCE,
-        [this]()
         { sendMessage(); })
+    // _taskFollowUpHeartbeat removed: message loss is already recovered by the
+    // periodic heartbeat; the extra send added network load without clear benefit.
 {
     Scarfnet::log("Scarf::Scarf()");
 }
@@ -76,6 +75,13 @@ void Scarf::onConnectionChange()
 
 void Scarf::onReceivedData(const JsonDocument &doc)
 {
+    // Track arrival delta for every heartbeat regardless of whether we accept
+    // the pattern change — this builds up our network-distance estimates.
+    const uint32_t senderId = doc["id"];
+    const Mesh::TimeMs senderTimeMs = doc["currentTimeMs"];
+    const int32_t arrivalDelta = (int32_t)_mesh->getNodeTimeMs() - (int32_t)senderTimeMs;
+    _mesh->recordArrivalDelta(senderId, arrivalDelta);
+
     const char *presetName = doc["pattern"];
     const Mesh::TimeMs lastRemoteButtonPressMs = doc["lastPress"];
     const Rnd randomizer = doc["randomizer"];
@@ -149,7 +155,6 @@ void Scarf::setup()
     _taskLogMemory.enable();
 
     _userScheduler.addTask(_taskBurstSync);
-    _userScheduler.addTask(_taskFollowUpHeartbeat);
 
     _blinkNoNodes.set(kNodeBlinkPeriodMs, _mesh->getNumNodes() * 2,
                         [&]()
@@ -171,7 +176,6 @@ void Scarf::processEvent(const ObservableButton::Event &event)
             _patternManager->incrementPattern(_lastSelfButtonPressMs);
             _changeIndex += 1;
             _taskSendMessage.forceNextIteration();
-            _taskFollowUpHeartbeat.enableDelayed(kFollowUpHeartbeatMs);
             Scarfnet::log("Event.ePress to pattern %s with randomizer %i (changeIndex: %i)",
                 _patternManager->getCurrentPattern().c_str(), calcRandomizer(_lastSelfButtonPressMs), _changeIndex);
             break;
@@ -182,7 +186,6 @@ void Scarf::processEvent(const ObservableButton::Event &event)
             _patternManager->samePatternDifferentRandomizer(_lastSelfButtonPressMs);
             _changeIndex += 1;
             _taskSendMessage.forceNextIteration();
-            _taskFollowUpHeartbeat.enableDelayed(kFollowUpHeartbeatMs);
             Scarfnet::log("Event.eLongPress to pattern %s with randomizer %i (changeIndex: %i)",
                 _patternManager->getCurrentPattern().c_str(), calcRandomizer(_lastSelfButtonPressMs), _changeIndex);
             break;
