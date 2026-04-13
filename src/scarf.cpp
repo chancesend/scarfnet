@@ -5,6 +5,7 @@
 #include "patterns.h"
 #include "palettes.h"
 #include "log.h"
+#include "sync.h"
 //#include <Arduino.h>
 #include <ArduinoJson.h>
 
@@ -68,13 +69,11 @@ void Scarf::onReceivedData(const JsonDocument &doc)
     const Mesh::TimeMs lastRemoteButtonPressMs = doc["lastPress"];
     const Rnd randomizer = doc["randomizer"];
     const uint32_t changeIndex = doc["changeIndex"];
-    if (changeIndex > _changeIndex)
+    if (shouldAcceptUpdate(changeIndex, _changeIndex))
     {
-        // changeIndex and lastPress are sensitive to rollover
-        // (though not for several days or millions of presses).
-        // Cap at 0x7fffffff to force-roll before overflow locks us out.
-        _changeIndex = changeIndex > 0x7fffffff ? 0 : changeIndex;
-        _lastSelfButtonPressMs = lastRemoteButtonPressMs > 0x7fffffff ? 0 : lastRemoteButtonPressMs;
+        // Cap at 0x7fffffff to force-reset before overflow locks out future updates.
+        _changeIndex = rolloverGuard(changeIndex);
+        _lastSelfButtonPressMs = rolloverGuard(lastRemoteButtonPressMs);
 
         Scarfnet::log("Scarf::onReceivedData(). Changing pattern to %s (randomizer %i)", presetName, randomizer);
         _patternManager->changePatternFromString(presetName, randomizer);

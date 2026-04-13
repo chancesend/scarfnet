@@ -48,8 +48,8 @@ public:
     // Returns a mesh-synchronized millisecond timestamp with rollover protection.
     uint32_t getNodeTimeMs();
 
-    // Extracted for unit testing: converts a raw painlessMesh node time
-    // (microseconds, uint32_t) to a millisecond timestamp with rollover tracking.
+    // Delegates to Scarfnet::computeNodeTimeMs (see mesh_time.h). Kept as a
+    // static method for call sites that already have a Mesh instance.
     static uint32_t computeNodeTimeMs(uint32_t rawNodeTime, int32_t& lastNodeTimeMs, int32_t& rolloverCount);
 
     // Returns the number of nodes in the mesh, including this node.

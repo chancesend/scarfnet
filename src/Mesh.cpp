@@ -1,4 +1,5 @@
 #include "Mesh.h"
+#include "mesh_time.h"
 #include "log.h"
 
 namespace Scarfnet
@@ -115,16 +116,7 @@ uint32_t Mesh::getMeshNodeTimeRaw()
 
 /*static*/ uint32_t Mesh::computeNodeTimeMs(uint32_t rawNodeTime, int32_t& lastNodeTimeMs, int32_t& rolloverCount)
 {
-    const uint32_t kShift = 10; // divide microseconds by 1024 ≈ milliseconds
-    const int32_t nodeTimeMs = (int32_t)(rawNodeTime >> kShift);
-    const int32_t kRolloverThresholdMs = 1000 * 1000;
-    if (nodeTimeMs - lastNodeTimeMs < -kRolloverThresholdMs)
-    {
-        rolloverCount++;
-        Scarfnet::log("getNodeTime() rollover!");
-    }
-    lastNodeTimeMs = nodeTimeMs;
-    return ((uint32_t)nodeTimeMs & 0x003fffffu) | (((uint32_t)rolloverCount << (32u - kShift)) & 0xffc00000u);
+    return Scarfnet::computeNodeTimeMs(rawNodeTime, lastNodeTimeMs, rolloverCount);
 }
 
 uint32_t Mesh::getNodeTimeMs()
