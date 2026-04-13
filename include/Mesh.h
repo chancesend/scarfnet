@@ -21,6 +21,9 @@ struct MeshConnection
     uint16_t    port;
 };
 
+// Wraps painlessMesh and exposes observer hooks for connection events and
+// incoming JSON messages. Also provides a synchronized millisecond timestamp
+// with rollover protection.
 class Mesh
 {
 public:
@@ -28,7 +31,7 @@ public:
     typedef std::function<void()> ConnectionCallback_t;
     typedef std::function<void(const JsonDocument&)> ReceivedDataCallback_t;
     typedef int32_t TimeMs;
-    
+
     Mesh(MeshConnection connection, Scheduler* scheduler) :
         Mesh(connection.ssid, connection.password, scheduler, connection.port)
     {
@@ -36,32 +39,37 @@ public:
 
     Mesh(std::string ssid, std::string password, Scheduler* scheduler, uint16_t port);
 
+    // Must be called every loop iteration to drive the mesh and TaskScheduler.
     void update();
 
     uint32_t getNodeId() { return _mesh.getNodeId(); };
 
     uint32_t getMeshNodeTimeRaw();
+    // Returns a mesh-synchronized millisecond timestamp with rollover protection.
     uint32_t getNodeTimeMs();
 
     // Extracted for unit testing: converts a raw painlessMesh node time
     // (microseconds, uint32_t) to a millisecond timestamp with rollover tracking.
     static uint32_t computeNodeTimeMs(uint32_t rawNodeTime, int32_t& lastNodeTimeMs, int32_t& rolloverCount);
 
+    // Returns the number of nodes in the mesh, including this node.
     int getNumNodes()
     {
         return (_mesh.getNodeList().size() + 1);
     }
 
     bool sendBroadcast(TSTRING msg, bool includeSelf = false)
-    { 
-        return _mesh.sendBroadcast(msg, includeSelf); 
+    {
+        return _mesh.sendBroadcast(msg, includeSelf);
     };
 
+    // Triggers a one-shot delay calculation to estimate link latency.
     void doDelayCalc()
     {
         delayCalc();
     }
-    
+
+    // Registers a callback invoked whenever the mesh topology changes.
     void addConnectionObserver(const ConnectionCallback_t& observer)
     {
         Scarfnet::log("[MESH] registering connection observer\n");
@@ -76,6 +84,7 @@ public:
         }
     }
 
+    // Registers a callback invoked whenever a JSON broadcast is received.
     void addReceivedDataObserver(const ReceivedDataCallback_t& observer)
     {
         _receivedDataObservers.push_back(observer);

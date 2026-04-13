@@ -1,18 +1,17 @@
 #include "ObservableButton.h"
+#include "config.h"
 #include "log.h"
 
 namespace Scarfnet
 {
 
-const unsigned long kTaskCheckButtonPressIntervalMs = 50; // in milliseconds
-
 ObservableButton::ObservableButton(Scheduler *scheduler, uint8_t buttonPin) : _scheduler(scheduler),
                                                                                 _button(buttonPin, 1, 10),
-                                                                                _taskCheckButtonEvent(kTaskCheckButtonPressIntervalMs, TASK_FOREVER,
+                                                                                _taskCheckButtonEvent(kButtonPollIntervalMs, TASK_FOREVER,
                                                                                                     [&]()
                                                                                                     { this->checkButtonEvent(); })
 {
-    Scarfnet::log("ObservableButton::ObservableButton()\n");
+    Scarfnet::log("ObservableButton::ObservableButton()");
 }
 
 void ObservableButton::setup()
@@ -23,37 +22,34 @@ void ObservableButton::setup()
 
 void ObservableButton::checkButtonEvent()
 {
-    const int32_t kLongPressTimeMs = 1000;
-    const int32_t kExtraLongPressTimeMs = 7000;
     const auto instantState = _button.read();
 
     if (_button.wasPressed())
     {
         _buttonState = kButtonState_Pressed;
-        Scarfnet::log("Button press!\n");
+        Scarfnet::log("Button press!");
     }
-    else if (_button.pressedFor(kLongPressTimeMs) && _buttonState != kButtonState_LongPressed)
+    else if (_button.pressedFor(kLongPressMs) && _buttonState != kButtonState_LongPressed)
     {
         _buttonState = kButtonState_LongPressed;
-        Scarfnet::log("Long press!\n");
+        Scarfnet::log("Long press!");
         onEvent(Event::eLongPress);
     }
-    else if (_button.pressedFor(kExtraLongPressTimeMs) && _buttonState != kButtonState_ExtraLongPressed)
+    else if (_button.pressedFor(kExtraLongPressMs) && _buttonState != kButtonState_ExtraLongPressed)
     {
         _buttonState = kButtonState_ExtraLongPressed;
-        Scarfnet::log("Extra-long press!\n");
+        Scarfnet::log("Extra-long press!");
         onEvent(Event::eExtraLongPress);
     }
     else if (_button.wasReleased() && _buttonState == kButtonState_LongPressed)
     {
         _buttonState = kButtonState_Up;
-        Scarfnet::log("Button long press release!\n");
+        Scarfnet::log("Button long press release!");
     }
     else if (_button.wasReleased() && _buttonState == kButtonState_Pressed)
     {
         _buttonState = kButtonState_Up;
-        Scarfnet::log("Button short press release!\n");
-        // selectNextPattern();
+        Scarfnet::log("Button short press release!");
         onEvent(Event::ePress);
     }
 }

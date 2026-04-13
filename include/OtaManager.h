@@ -34,13 +34,18 @@ public:
     // triggered (button held 10 s); false if button was released early.
     bool checkBootTrigger();
 
-    // Service the OTA mode each loop iteration.
+    // Must be called every loop iteration while in OTA mode (normal mesh loop is skipped).
     void loop();
 
+    // Returns true after checkBootTrigger() confirmed OTA mode.
     bool isActive() const { return _active; }
+    // Returns the current OTA sub-mode (receiver or server).
     Mode getMode()  const { return _mode; }
 
 private:
+    // --- LED helpers ---
+    void strobe(CRGB color, int count, int onMs, int offMs);
+
     // --- Server ---
     void enterServerMode();
     bool computeFirmwareInfo(); // populates _firmwareSize and _firmwareMd5
@@ -51,6 +56,9 @@ private:
     // --- Receiver ---
     void receiverLoop();
     bool attemptDownload(const String& serverSsid);
+    bool connectToServer(const String& ssid);
+    bool fetchFirmwareInfo(const String& base, int& serverVersion, size_t& firmwareSize, String& firmwareMd5);
+    bool downloadAndFlash(const String& base, size_t firmwareSize, const String& firmwareMd5, int serverVersion);
 
     int         _buttonPin;
     LedSetter   _ledSetter;

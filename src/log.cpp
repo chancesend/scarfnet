@@ -14,6 +14,7 @@ void log( const char *msg , ... )
    va_start( args, msg );
    vprintf( msg, args );
    va_end( args );
+   putchar('\n');
 }
 
 }

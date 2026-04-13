@@ -17,16 +17,18 @@
 namespace Scarfnet
 {
 
+// Polls a hardware button on a TaskScheduler task and classifies presses into
+// discrete events. Observers are notified synchronously on the scheduler task.
 class ObservableButton
 {
 public:
-        enum Event {
-            ePress = 0,
-            eLongPress,
-            eDoublePress,
-            eRelease,
-            eExtraLongPress,
-        };
+    enum Event {
+        ePress = 0,
+        eLongPress,
+        eDoublePress,
+        eRelease,
+        eExtraLongPress,
+    };
     typedef std::function<void(const Event&)> EventCallback_t;
 
     enum ButtonState
@@ -40,6 +42,7 @@ public:
 
     ObservableButton(Scheduler* scheduler, uint8_t buttonPin);
 
+    // Registers a callback invoked on each button event.
     void addObserver(const EventCallback_t& observer)
     {
         _observers.push_back(observer);
@@ -51,7 +54,8 @@ public:
             observer(event);
         }
     }
-    
+
+    // Adds the polling task to the scheduler. Must be called once during setup.
     void setup();
 
 private:

@@ -18,7 +18,7 @@ inline uint8_t interpUint8(uint8_t val, uint8_t low, uint8_t high)
 
 PatternList getPatternList()
 {
-  Scarfnet::log("getPatternList()\n");
+  Scarfnet::log("getPatternList()");
   PatternList patterns;
   patterns.clear();
   
@@ -59,11 +59,10 @@ PatternList getPatternList()
   //        testpattern(leds, timeMs);
   //    }});
 
-  Scarfnet::log("Pattern list (%zu patterns): ", patterns.size());
-  for (auto pattern: patterns) {
-    Scarfnet::log("%s, ", pattern.first.c_str());
-  }
-  Scarfnet::log("\n");
+  String line = String("Pattern list (") + patterns.size() + " patterns): ";
+  for (auto pattern: patterns)
+    line += pattern.first.c_str() + String(", ");
+  Scarfnet::log(line.c_str());
 
   return patterns;
 }
