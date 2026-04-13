@@ -28,21 +28,27 @@ std::unique_ptr<T> make_unique(Args&&... args)
     return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
+// Top-level coordinator. Wires together Mesh, ObservableButton, PatternManager,
+// and OtaManager. Call setup() once, then loop() or otaLoop() every iteration
+// depending on isInOtaMode().
 class Scarf
 {
 public:
     Scarf();
 
+    // Initializes all subsystems. If OTA mode is triggered at boot, returns
+    // immediately — mesh and pattern setup are skipped.
     void setup();
+    // Normal operation loop: drives the mesh, renders LEDs, and blends palettes.
     void loop();
+    // OTA operation loop: services the OtaManager while mesh is inactive.
     void otaLoop();
 
+    // Returns true when OTA mode was triggered at boot.
     bool isInOtaMode() const { return _otaManager && _otaManager->isActive(); }
     Mesh::TimeMs getTimeMsec() { return this->_timeMsec; }
 
 private:
-    const int kBlinkPeriodMs = 3000; // milliseconds until cycle repeat
-
     // Prototypes
 
     void showLEDs();
@@ -56,7 +62,6 @@ private:
     void onReceivedData(const JsonDocument& doc);
 
     Mesh::TimeMs     _timeMsec {0};
-    uint32_t    _syncBlinkPeriodMs{5000};
     
     ObservableButton      _nextPatternButton;
     Mesh::TimeMs _lastSelfButtonPressMs {0};

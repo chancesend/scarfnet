@@ -14,7 +14,7 @@ Mesh::Mesh(std::string ssid, std::string password, Scheduler *scheduler, uint16_
         { this->receivedCallback(from, msg); });
     _mesh.onNewConnection([&](uint32_t nodeId)
         {
-            Scarfnet::log("[MESH] NEW CONNECTION!!\n");
+            Scarfnet::log("[MESH] NEW CONNECTION!!");
             this->newConnectionCallback(nodeId);
             });
     _mesh.onDroppedConnection([&](uint32_t nodeId) 
@@ -25,7 +25,7 @@ Mesh::Mesh(std::string ssid, std::string password, Scheduler *scheduler, uint16_
         { this->nodeTimeAdjustedCallback(offset); });
     _mesh.onNodeDelayReceived([&](uint32_t nodeId, int32_t delay)
         { this->delayReceivedCallback(nodeId, delay); });
-    Scarfnet::log("Mesh::Mesh\n");
+    Scarfnet::log("Mesh::Mesh");
 }
 
 void Mesh::update()
@@ -48,12 +48,12 @@ void Mesh::delayCalc()
 
 void Mesh::receivedCallback(uint32_t from, String &msg)
 {
-    Scarfnet::log("[MESH][RCV node %u] msg=%s\n", from, msg.c_str());
+    Scarfnet::log("[MESH][RCV node %u] msg=%s", from, msg.c_str());
     JsonDocument doc;
     auto err = deserializeJson(doc, msg);
     if (err)
     {
-        Scarfnet::log("[MESH][RCV] JSON parse error: %s\n", err.c_str());
+        Scarfnet::log("[MESH][RCV] JSON parse error: %s", err.c_str());
         return;
     }
 
@@ -66,31 +66,29 @@ void Mesh::receivedCallback(uint32_t from, String &msg)
 void Mesh::newConnectionCallback(uint32_t nodeId)
 {
     auto jsonLayout = _mesh.subConnectionJson(true);
-    Scarfnet::log("[MESH][NEW node %u] %s\n", nodeId, jsonLayout.c_str());
+    Scarfnet::log("[MESH][NEW node %u] %s", nodeId, jsonLayout.c_str());
     // changedConnectionCallback fires immediately after and notifies observers
 }
 
 void Mesh::droppedConnectionCallback(uint32_t nodeId)
 {
     auto jsonLayout = _mesh.subConnectionJson(true);
-    Scarfnet::log("[MESH][DROP node %u] %s\n", nodeId, jsonLayout.c_str());
+    Scarfnet::log("[MESH][DROP node %u] %s", nodeId, jsonLayout.c_str());
     // changedConnectionCallback fires immediately after and notifies observers
 }
 
 void Mesh::printConnectionList()
 {
     auto nodes = _mesh.getNodeList();
-    Scarfnet::log("Connection list (%d nodes):", nodes.size());
+    String line = String("Connection list (") + nodes.size() + " nodes):";
     for (auto node : nodes)
-    {
-        Scarfnet::log(" %u", node);
-    }
-    Scarfnet::log("\n");
+        line += String(" ") + node;
+    Scarfnet::log(line.c_str());
 }
 
 void Mesh::changedConnectionCallback()
 {
-    Scarfnet::log("[MESH] Changed connections\n");
+    Scarfnet::log("[MESH] Changed connections");
     this->printConnectionList();
     _calcDelay = true;
 
@@ -102,12 +100,12 @@ void Mesh::changedConnectionCallback()
 
 void Mesh::nodeTimeAdjustedCallback(int32_t offset)
 {
-    Scarfnet::log("[MESH] Adjusted time %ums. Offset = %d\n", this->getNodeTimeMs(), offset);
+    Scarfnet::log("[MESH] Adjusted time %ums. Offset = %d", this->getNodeTimeMs(), offset);
 }
 
 void Mesh::delayReceivedCallback(uint32_t from, int32_t delay)
 {
-    Scarfnet::log("[MESH] Delay to node %u is %d us\n", from, delay);
+    Scarfnet::log("[MESH] Delay to node %u is %d us", from, delay);
 }
 
 uint32_t Mesh::getMeshNodeTimeRaw()
@@ -123,7 +121,7 @@ uint32_t Mesh::getMeshNodeTimeRaw()
     if (nodeTimeMs - lastNodeTimeMs < -kRolloverThresholdMs)
     {
         rolloverCount++;
-        Scarfnet::log("getNodeTime() rollover!\n");
+        Scarfnet::log("getNodeTime() rollover!");
     }
     lastNodeTimeMs = nodeTimeMs;
     return ((uint32_t)nodeTimeMs & 0x003fffffu) | (((uint32_t)rolloverCount << (32u - kShift)) & 0xffc00000u);

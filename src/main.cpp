@@ -14,21 +14,21 @@ void setup()
 {
     Serial.begin(115200);
 
-    Scarfnet::log("setup() 1\n");
+    Scarfnet::log("setup() 1");
     Scheduler userScheduler;
 
     Scarfnet::MeshConnection connection;
     connection.ssid = kMeshSSID;
     connection.password = kMeshPassword;
     connection.port = kMeshPort;
-    Scarfnet::log("setup() 2\n");
+    Scarfnet::log("setup() 2");
     scarf.setup();
 }
 
 // This is pre-defined by arduino
 void loop()
 {
-//    Scarfnet::log("loop()\n");
+//    Scarfnet::log("loop()");
 
     try
     {
@@ -39,7 +39,7 @@ void loop()
     }
     catch (std::exception& e)
     {
-        Scarfnet::log("Exception: %s\n", e.what());
+        Scarfnet::log("Exception: %s", e.what());
         return;
     }
 }
