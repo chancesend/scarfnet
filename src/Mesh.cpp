@@ -14,7 +14,7 @@ Mesh::Mesh(std::string ssid, std::string password, Scheduler *scheduler, uint16_
         { this->receivedCallback(from, msg); });
     _mesh.onNewConnection([&](uint32_t nodeId)
         {
-            Scarfnet::log("###NEW CONNECTION!!\n");
+            Scarfnet::log("[MESH] NEW CONNECTION!!\n");
             this->newConnectionCallback(nodeId);
             });
     _mesh.onDroppedConnection([&](uint32_t nodeId) 
