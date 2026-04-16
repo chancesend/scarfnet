@@ -4,6 +4,7 @@
 #include "observable_button/test_ObservableButton.h"
 #include "patterns/test_patterns.h"
 #include "scheduler/test_scheduler.h"
+#include "swarm/test_swarm_ema.h"
 #include "sync/test_sync.h"
 
 void setUp(void) {
@@ -26,6 +27,7 @@ int main( int argc, char **argv) {
     observable_button_tests();
     patterns_tests();
     scheduler_tests();
+    swarm_ema_tests();
     sync_tests();
     
     UNITY_END();
