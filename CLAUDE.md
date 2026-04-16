@@ -34,7 +34,13 @@ pio test -e native
 pio test -e native -v
 ```
 
-Tests live in `test/test_scarfnet/` and are organized into subdirectories by component (`mesh/`, `observable_button/`, `patterns/`). `test_main.cpp` is the entry point that calls each component's test suite function.
+Tests live in `test/test_scarfnet/` and are organized into subdirectories by component (`mesh/`, `observable_button/`, `patterns/`, `sync/`). `test_main.cpp` is the entry point that calls each component's test suite function.
+
+**Native test infrastructure note**: `Mesh.h` pulls in `painlessMesh.h → Arduino.h` and cannot compile natively. Logic that needs unit testing is extracted into standalone headers with no hardware deps:
+- `include/mesh_time.h` — `Scarfnet::computeNodeTimeMs` (inline, uses `printf`)
+- `include/sync.h` — `shouldAcceptUpdate` and `rolloverGuard` (inline, no deps)
+
+Test files include these directly instead of `Mesh.h`. `src/` files are not compiled in native test mode.
 
 ## Architecture
 
@@ -60,7 +66,13 @@ The firmware uses an **observer pattern** throughout. The top-level coordinator 
 
 ### Sync Protocol
 
-When a button is pressed, `Scarf::processEvent` updates `_lastSelfButtonPressMs`, `_changeIndex`, and the local pattern, then forces an immediate broadcast via `TaskScheduler`. Remote nodes receive a JSON payload containing `{id, lastPress, pattern, randomizer, currentTimeMs, changeIndex}`. `Scarf::onReceivedData` accepts an incoming update only if `changeIndex` or `lastPress` is newer than local state, preventing oscillation and echo. A rollover guard caps values at `0x7fffffff`.
+When a button is pressed, `Scarf::processEvent` updates `_lastSelfButtonPressMs`, `_changeIndex`, and the local pattern, then forces an immediate broadcast via `TaskScheduler`. Remote nodes receive a JSON payload containing `{id, lastPress, pattern, randomizer, currentTimeMs, changeIndex}`. `Scarf::onReceivedData` accepts an incoming update only if `changeIndex` is newer than local state (via `shouldAcceptUpdate` in `sync.h`), preventing oscillation and echo. A rollover guard (`rolloverGuard` in `sync.h`) caps values at `0x7fffffff`.
+
+After a topology change, `_taskBurstSync` fires `kBurstSyncCount` (3) extra heartbeats at `kBurstSyncIntervalMs` (500ms) intervals to give painlessMesh more timing samples for clock convergence.
+
+### Swarm / Arrival Delta Tracking
+
+`Mesh::recordArrivalDelta(nodeId, rawDeltaMs)` is called on every received heartbeat with `delta = receiverTimeMs - doc["currentTimeMs"]`. This is an estimate of one-way propagation delay from that node and is smoothed with an EMA (α=0.2). Values are stored in `_nodeArrivalDeltas` and accessible via `Mesh::getArrivalDelta(nodeId)`. Currently used only for logging (`[SWARM]` prefix) to characterize signal stability — future use for phase-offsetting animation per `future-work/swarm-patterns.md`.
 
 ### Button Behaviors
 
@@ -80,11 +92,33 @@ The type is toggled via extra-long press and survives reboots.
 
 ## Key Configuration Files
 
-- `include/login.h` — **Not in git.** Contains mesh SSID, password, and port (`kMeshSSID`, `kMeshPassword`, `kMeshPort`). Must be created locally.
+- `include/login.h` — **Not in git (gitignored).** Contains mesh SSID, password, and port (`kMeshSSID`, `kMeshPassword`, `kMeshPort`). Must be created locally.
 - `include/config.h` — All timing constants for the whole codebase (button poll/hold thresholds, LED refresh rates, heartbeat interval, OTA scan/connect/blink timings, flash chunk size). Single source of truth — do not hard-code timing values elsewhere.
 - `include/version.h` — `FIRMWARE_VERSION` (integer, increment before flashing OTA updates) and `OTA_HTTP_USER` (HTTP Basic Auth username).
 - `include/defines.h` — Pin assignments, LED count, LED type enums, and the `SCARFNET_EMBEDDED` compile guard.
 - `include/typedefs.h` — Core type aliases: `Leds` (`std::vector<CRGB>`) and `Rnd` (`uint8_t`).
+
+## Python Tooling
+
+Python scripts live in `tools/`. Use `uv` for all Python work — never bare `python3`.
+
+```bash
+# Run a tool script
+uv run tools/scarfnet-log-viz.py logs/session.txt -o traces.json
+
+# Scripts are also directly executable via their uv shebang
+./tools/scarfnet-log-viz.py logs/session.txt -o traces.json
+```
+
+All scripts use [PEP 723 inline script metadata](https://peps.python.org/pep-0723/) to declare their Python version and dependencies:
+
+```python
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["some-package"]
+# ///
+```
 
 ## Compile-Time Guard
 
