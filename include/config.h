@@ -18,6 +18,14 @@ const uint32_t kMemLogIntervalMs          = 60000;
 const int kNodeBlinkPeriodMs              = 3000;
 const uint32_t kSyncBlinkPeriodMs         = 5000;
 
+// ── SWARM arrival delta EMA ───────────────────────────────────────────────────
+// Samples beyond this magnitude are discarded before entering the EMA.
+// Prevents a freshly-rebooted node's unsettled clock from poisoning the
+// smoothed value with a multi-minute initial error.  5000ms is generous enough
+// to cover several mesh hops while still rejecting the seconds-to-minutes
+// errors that appear during clock convergence after rejoin.
+const int32_t  kSwarmMaxArrivalDeltaMs    = 5000;
+
 // ── Scarf: sync burst after connection change ─────────────────────────────────
 // After a topology change, send kBurstSyncCount extra heartbeats at
 // kBurstSyncIntervalMs so painlessMesh has more samples for time convergence.
