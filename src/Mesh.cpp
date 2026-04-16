@@ -1,5 +1,6 @@
 #include "Mesh.h"
 #include "mesh_time.h"
+#include "swarm_ema.h"
 #include "log.h"
 
 namespace Scarfnet
@@ -126,21 +127,22 @@ uint32_t Mesh::getNodeTimeMs()
 
 void Mesh::recordArrivalDelta(uint32_t nodeId, int32_t rawDeltaMs)
 {
-    auto it = _nodeArrivalDeltas.find(nodeId);
-    if (it == _nodeArrivalDeltas.end())
+    if (!swarmDeltaIsPlausible(rawDeltaMs, kSwarmMaxArrivalDeltaMs))
     {
-        _nodeArrivalDeltas[nodeId] = rawDeltaMs;
+        Scarfnet::log("[SWARM] node %u delta: raw=%dms DISCARDED (outside ±%dms window)",
+                      nodeId, rawDeltaMs, kSwarmMaxArrivalDeltaMs);
+        return;
+    }
+
+    // Seed new entries at 0 so the first sample is weighted by alpha rather
+    // than replacing the stored value outright (see swarm_ema.h).
+    auto [it, inserted] = _nodeArrivalDeltas.emplace(nodeId, int32_t{0});
+    if (inserted)
         Scarfnet::log("[SWARM] node %u first delta: %dms", nodeId, rawDeltaMs);
-    }
-    else
-    {
-        // Exponential moving average: new = 0.2*raw + 0.8*prev
-        // Converges to ~85% of a step change after ~10 heartbeats (~30s).
-        const float kAlpha = 0.2f;
-        int32_t smoothed = (int32_t)(kAlpha * rawDeltaMs + (1.0f - kAlpha) * it->second);
-        Scarfnet::log("[SWARM] node %u delta: raw=%dms smoothed=%dms", nodeId, rawDeltaMs, smoothed);
-        it->second = smoothed;
-    }
+
+    int32_t smoothed = swarmEmaUpdate(rawDeltaMs, it->second);
+    Scarfnet::log("[SWARM] node %u delta: raw=%dms smoothed=%dms", nodeId, rawDeltaMs, smoothed);
+    it->second = smoothed;
 }
 
 int32_t Mesh::getArrivalDelta(uint32_t nodeId) const
