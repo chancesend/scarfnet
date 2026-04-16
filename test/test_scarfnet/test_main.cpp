@@ -3,6 +3,7 @@
 #include "mesh/test_mesh.h"
 #include "observable_button/test_ObservableButton.h"
 #include "patterns/test_patterns.h"
+#include "scheduler/test_scheduler.h"
 #include "sync/test_sync.h"
 
 void setUp(void) {
@@ -24,6 +25,7 @@ int main( int argc, char **argv) {
     mesh_tests();
     observable_button_tests();
     patterns_tests();
+    scheduler_tests();
     sync_tests();
     
     UNITY_END();
