@@ -3,13 +3,3 @@ Scarf Net!
 
 Plug 'em in, and watch 'em move :-)
 
-TODO list
-* More patterns! At least 8
-    * Patterns should be based more on common mesh time, so we see sync
-    * Can we make all the scarves extensions of the same pattern?
-* Any way to transmit full (new) patterns to other nodes?
-* Add very slight delay of secondary nodes when playing received pattern?
-* OTA updates?
-
-* Scarf sometimes crashes (LEDs still lit, no movement)
-* Visual notification when scarf enters/leaves network?
