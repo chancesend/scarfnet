@@ -53,10 +53,16 @@ public:
     // static method for call sites that already have a Mesh instance.
     static uint32_t computeNodeTimeMs(uint32_t rawNodeTime, int32_t& lastNodeTimeMs, int32_t& rolloverCount);
 
-    // Returns the number of nodes in the mesh, including this node.
+    // Returns the number of distinct nodes in the mesh, including this node.
+    // sort()+unique() guards against transient duplicate nodeIds that painlessMesh
+    // can produce during topology churn (two neighbours briefly claiming the same
+    // remote node as their subtree descendant).
     int getNumNodes()
     {
-        return (_mesh.getNodeList().size() + 1);
+        auto nodes = _mesh.getNodeList();
+        nodes.sort();
+        nodes.unique();
+        return (int)nodes.size() + 1;
     }
 
     bool sendBroadcast(TSTRING msg, bool includeSelf = false)

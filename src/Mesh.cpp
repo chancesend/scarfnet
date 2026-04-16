@@ -82,6 +82,8 @@ void Mesh::droppedConnectionCallback(uint32_t nodeId)
 void Mesh::printConnectionList()
 {
     auto nodes = _mesh.getNodeList();
+    nodes.sort();
+    nodes.unique();
     String line = String("Connection list (") + nodes.size() + " nodes):";
     for (auto node : nodes)
         line += String(" ") + node;
