@@ -127,6 +127,11 @@ private:
     TimeMs   _lastNodeTimeMs {0};
     int32_t     _rolloverCount {0};
 
+    // Clock-stability gate for SWARM EMA (see config.h kSwarmSettle*).
+    // Counts down from kSwarmSettleAdjustments to 0 after each topology change.
+    // EMA updates are blocked while > 0.
+    int _swarmSettleCounter {0};
+
     // EMA-smoothed one-way arrival delta per peer node (ms). Populated by
     // recordArrivalDelta() and used to estimate "network distance" for swarm patterns.
     std::map<uint32_t, int32_t> _nodeArrivalDeltas;

@@ -77,6 +77,8 @@ void Mesh::droppedConnectionCallback(uint32_t nodeId)
 {
     auto jsonLayout = _mesh.subConnectionJson(true);
     Scarfnet::log("[MESH][DROP node %u] %s", nodeId, jsonLayout.c_str());
+    // Erase stale EMA so the node starts fresh if it rejoins.
+    _nodeArrivalDeltas.erase(nodeId);
     // changedConnectionCallback fires immediately after and notifies observers
 }
 
@@ -97,6 +99,11 @@ void Mesh::changedConnectionCallback()
     this->printConnectionList();
     _calcDelay = true;
 
+    // Re-arm the clock-stability gate so EMA updates are blocked until the
+    // mesh clock has had time to converge after this topology change.
+    _swarmSettleCounter = kSwarmSettleAdjustments;
+    Scarfnet::log("[SWARM] Clock stability gate armed (%d adjustments required)", kSwarmSettleAdjustments);
+
     for (const auto& observer : _connectionObservers)
     {
         observer();
@@ -106,6 +113,23 @@ void Mesh::changedConnectionCallback()
 void Mesh::nodeTimeAdjustedCallback(int32_t offset)
 {
     Scarfnet::log("[MESH] Adjusted time %ums. Offset = %d", this->getNodeTimeMs(), offset);
+
+    if (_swarmSettleCounter <= 0)
+        return;
+
+    if (abs(offset) < kSwarmSettleOffsetThresholdUs)
+    {
+        _swarmSettleCounter--;
+        Scarfnet::log("[SWARM] Clock settling (%d/%d small adjustments)",
+                      kSwarmSettleAdjustments - _swarmSettleCounter, kSwarmSettleAdjustments);
+        if (_swarmSettleCounter == 0)
+            Scarfnet::log("[SWARM] Clock stable — EMA updates re-enabled");
+    }
+    else
+    {
+        // Large offset: reset the counter, clock is still bouncing.
+        _swarmSettleCounter = kSwarmSettleAdjustments;
+    }
 }
 
 void Mesh::delayReceivedCallback(uint32_t from, int32_t delay)
@@ -130,6 +154,13 @@ uint32_t Mesh::getNodeTimeMs()
 
 void Mesh::recordArrivalDelta(uint32_t nodeId, int32_t rawDeltaMs)
 {
+    if (_swarmSettleCounter > 0)
+    {
+        Scarfnet::log("[SWARM] node %u delta: raw=%dms GATED (clock settling, %d adj remaining)",
+                      nodeId, rawDeltaMs, _swarmSettleCounter);
+        return;
+    }
+
     if (!swarmDeltaIsPlausible(rawDeltaMs, kSwarmMaxArrivalDeltaMs))
     {
         Scarfnet::log("[SWARM] node %u delta: raw=%dms DISCARDED (outside ±%dms window)",
