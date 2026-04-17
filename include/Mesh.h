@@ -1,146 +1,120 @@
 #pragma once
 
-#include <painlessMesh.h>
+// defines.h sets SCARFNET_EMBEDDED for the embedded target; include it first
+// so the guard below works regardless of include order in the caller.
+#include "defines.h"
 
-#include <ArduinoJson.h>
+#ifdef SCARFNET_EMBEDDED
 
-#include <vector>
-#include <map>
-#include <memory>
+#include <esp_now.h>
+#include <freertos/portmacro.h>
 #include <functional>
-#include <stdint.h>
+#include <unordered_map>
+#include <cstdint>
 
 #include "log.h"
+#include "sync.h"  // for ChangeIndex
 
-namespace Scarfnet
-{
+namespace Scarfnet {
 
-struct MeshConnection
-{
-    std::string ssid;
-    std::string password;
-    uint16_t    port;
+// ── Namespace-level type aliases ─────────────────────────────────────────────
+// Defined here so HeartbeatPacket (which lives outside the Mesh class) can use
+// them. Mesh re-exports these as class aliases so Mesh::TimeMs / Mesh::NodeId
+// also work.
+using NodeId = uint32_t;  // last 4 MAC bytes as a stable peer identifier
+using TimeMs = uint32_t;  // synchronized millisecond clock value
+// ChangeIndex is defined in sync.h (same namespace)
+
+// ── Wire format ──────────────────────────────────────────────────────────────
+
+// Packed heartbeat broadcast over ESP-NOW. Well under the 250-byte limit.
+// Current size: 4+4+4+4+1+33 = 50 bytes.
+struct __attribute__((packed)) HeartbeatPacket {
+    NodeId      id;             // sender node ID (last 4 MAC bytes cast to uint32)
+    TimeMs      lastPress;      // synchronized time of last button press on sender
+    TimeMs      currentTimeMs;  // sender's synchronized clock (millis() + EMA offset)
+    ChangeIndex changeIndex;    // monotonic pattern-change counter
+    Rnd         randomizer;     // pattern seed (low byte of lastPress)
+    char        pattern[33];    // null-terminated pattern name, max 32 chars
 };
+static_assert(sizeof(HeartbeatPacket) <= 250, "HeartbeatPacket exceeds ESP-NOW 250-byte limit");
 
-// Wraps painlessMesh and exposes observer hooks for connection events and
-// incoming JSON messages. Also provides a synchronized millisecond timestamp
-// with rollover protection.
-class Mesh
-{
+// ── Mesh class ───────────────────────────────────────────────────────────────
+
+// Connectionless mesh over ESP-NOW broadcast. Each node broadcasts heartbeats
+// to FF:FF:FF:FF:FF:FF every kHeartbeatIntervalMs. Join/leave events are
+// synthesised from the heartbeat stream via timeout tracking.
+class Mesh {
 public:
-    typedef std::shared_ptr<Mesh> Ptr;
-    typedef std::function<void()> ConnectionCallback_t;
-    typedef std::function<void(const JsonDocument&)> ReceivedDataCallback_t;
-    typedef int32_t TimeMs;
+    // Re-exported so Mesh::TimeMs and Mesh::NodeId remain valid access paths.
+    using TimeMs      = Scarfnet::TimeMs;
+    using NodeId      = Scarfnet::NodeId;
+    using ChangeIndex = Scarfnet::ChangeIndex;
 
-    Mesh(MeshConnection connection, Scheduler* scheduler) :
-        Mesh(connection.ssid, connection.password, scheduler, connection.port)
-    {
-    }
+    using ReceivedCb  = std::function<void(const HeartbeatPacket&)>;
+    using NodeCb      = std::function<void(NodeId)>;
 
-    Mesh(std::string ssid, std::string password, Scheduler* scheduler, uint16_t port);
+    // Initialise WiFi in STA mode, start ESP-NOW, derive node ID from MAC.
+    // Must be called before update() or broadcast().
+    void begin();
 
-    // Must be called every loop iteration to drive the mesh and TaskScheduler.
+    // Call every loop iteration. Drains the rx queue (filled by the WiFi task)
+    // and fires node-leave callbacks for peers that have timed out.
     void update();
 
-    uint32_t getNodeId() { return _mesh.getNodeId(); };
+    // Node ID derived from the last 4 bytes of this device's MAC address.
+    NodeId nodeId()    const { return _nodeId; }
 
-    uint32_t getMeshNodeTimeRaw();
-    // Returns a mesh-synchronized millisecond timestamp with rollover protection.
-    uint32_t getNodeTimeMs();
+    // Synchronized millisecond clock: millis() + EMA-smoothed peer-offset.
+    // Converges across the fleet as heartbeats exchange currentTimeMs values.
+    TimeMs timeMs()    const;
 
-    // Delegates to Scarfnet::computeNodeTimeMs (see mesh_time.h). Kept as a
-    // static method for call sites that already have a Mesh instance.
-    static uint32_t computeNodeTimeMs(uint32_t rawNodeTime, int32_t& lastNodeTimeMs, int32_t& rolloverCount);
+    // Number of peer nodes currently tracked (excludes self).
+    size_t nodeCount() const { return _peers.size(); }
 
-    // Returns the number of distinct nodes in the mesh, including this node.
-    // sort()+unique() guards against transient duplicate nodeIds that painlessMesh
-    // can produce during topology churn (two neighbours briefly claiming the same
-    // remote node as their subtree descendant).
-    int getNumNodes()
-    {
-        auto nodes = _mesh.getNodeList();
-        nodes.sort();
-        nodes.unique();
-        return (int)nodes.size() + 1;
-    }
+    // Broadcast a heartbeat packet to all ESP-NOW peers on kEspNowChannel.
+    void broadcast(const HeartbeatPacket& pkt);
 
-    bool sendBroadcast(TSTRING msg, bool includeSelf = false)
-    {
-        return _mesh.sendBroadcast(msg, includeSelf);
-    };
-
-    // Records the one-way arrival delta (receiverTimeMs - senderTimeMs) for a
-    // node and updates its EMA-smoothed estimate. Called on every heartbeat.
-    void recordArrivalDelta(uint32_t nodeId, int32_t rawDeltaMs);
-
-    // Returns the EMA-smoothed arrival delta for a node, or 0 if unknown.
-    int32_t getArrivalDelta(uint32_t nodeId) const;
-
-    // Triggers a one-shot delay calculation to estimate link latency.
-    void doDelayCalc()
-    {
-        delayCalc();
-    }
-
-    // Registers a callback invoked whenever the mesh topology changes.
-    void addConnectionObserver(const ConnectionCallback_t& observer)
-    {
-        Scarfnet::log("[MESH] registering connection observer\n");
-        _connectionObservers.push_back(observer);
-    }
-    void onConnectionChange()
-    {
-        Scarfnet::log("[MESH] onConnectionChange()\n");
-        for(const auto& observer: _connectionObservers)
-        {
-            observer();
-        }
-    }
-
-    // Registers a callback invoked whenever a JSON broadcast is received.
-    void addReceivedDataObserver(const ReceivedDataCallback_t& observer)
-    {
-        _receivedDataObservers.push_back(observer);
-    }
-    void onReceivedData(const JsonDocument& doc)
-    {
-        for(const auto& observer: _receivedDataObservers)
-        {
-            observer(doc);
-        }
-    }
+    // Register callbacks. Each fires on the loop() task (not the WiFi task).
+    void onReceived(ReceivedCb cb)   { _receivedCb = std::move(cb); }
+    void onNodeJoined(NodeCb cb)     { _joinedCb   = std::move(cb); }
+    void onNodeLeft(NodeCb cb)       { _leftCb     = std::move(cb); }
 
 private:
-    void receivedCallback(uint32_t from, String & msg);
-    void newConnectionCallback(uint32_t nodeId);
-    void droppedConnectionCallback(uint32_t nodeId);
-    void changedConnectionCallback();
-    void nodeTimeAdjustedCallback(int32_t offset);
-    void delayReceivedCallback(uint32_t from, int32_t delay);
+    // ESP-NOW recv callback — runs on the WiFi task; enqueues to ring buffer.
+    static void espNowRecvCb(const uint8_t* mac, const uint8_t* data, int len);
+    // Processes one received packet on the loop task.
+    void handleReceived(const uint8_t* mac, const uint8_t* data, int len);
+    void checkNodeTimeouts();
+    // Update EMA clock offset from a peer's reported time.
+    void updateClock(TimeMs pktCurrentTimeMs);
 
-    void delayCalc();
-    void printConnectionList();
+    static NodeId macToNodeId(const uint8_t* mac);
 
-    bool _calcDelay {false};
-    painlessmesh::wifi::Mesh    _mesh;
-    TimeMs   _lastNodeTimeMs {0};
-    int32_t     _rolloverCount {0};
+    NodeId _nodeId       = 0;
+    float  _clockOffset  = 0.0f;  // timeMs() = millis() + (int32_t)_clockOffset
+    int    _clockSamples = 0;     // hard-set during warmup, EMA after
 
-    // Clock-stability gate for SWARM EMA (see config.h kSwarmSettle*).
-    // Counts down from kSwarmSettleAdjustments to 0 after each topology change.
-    // EMA updates are blocked while > 0.
-    int _swarmSettleCounter {0};
+    struct PeerState { uint32_t lastSeenMs; };
+    std::unordered_map<NodeId, PeerState> _peers;
 
-    // EMA-smoothed one-way arrival delta per peer node (ms). Populated by
-    // recordArrivalDelta() and used to estimate "network distance" for swarm patterns.
-    std::map<uint32_t, int32_t> _nodeArrivalDeltas;
+    ReceivedCb _receivedCb;
+    NodeCb     _joinedCb;
+    NodeCb     _leftCb;
 
-    typedef std::vector<ConnectionCallback_t> ConnectionObserverList;
-    ConnectionObserverList _connectionObservers;
-
-    typedef std::vector<ReceivedDataCallback_t> ReceivedDataObserverList;
-    ReceivedDataObserverList _receivedDataObservers;
+    // Ring buffer: espNowRecvCb (WiFi task) writes; update() (loop task) reads.
+    static constexpr int kRxQueueSize = 8;
+    struct RxEntry {
+        uint8_t mac[6];
+        uint8_t data[250];
+        int     len;
+    };
+    portMUX_TYPE _rxMux;
+    RxEntry      _rxQueue[kRxQueueSize];
+    int          _rxHead = 0;  // next write index (WiFi task)
+    int          _rxTail = 0;  // next read index  (loop task)
 };
 
-}
+} // namespace Scarfnet
+
+#endif // SCARFNET_EMBEDDED

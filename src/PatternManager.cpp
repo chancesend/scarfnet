@@ -37,7 +37,7 @@ void PatternManager::initPatterns()
     _currentPattern = _patterns.begin();
 }
 
-void PatternManager::incrementPattern(Mesh::TimeMs lastSelfPressMs)
+void PatternManager::incrementPattern(uint32_t lastSelfPressMs)
 {
     auto newPattern = _currentPattern + 1;
     if (newPattern == _patterns.end())
@@ -50,7 +50,7 @@ void PatternManager::incrementPattern(Mesh::TimeMs lastSelfPressMs)
     changePatternFromString(newPattern->first, randomizer);
 }
 
-void PatternManager::samePatternDifferentRandomizer(Mesh::TimeMs lastSelfPressMs)
+void PatternManager::samePatternDifferentRandomizer(uint32_t lastSelfPressMs)
 {
     auto newPattern = _currentPattern;
     const auto newName = newPattern->first.c_str();

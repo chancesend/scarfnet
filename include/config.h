@@ -18,26 +18,34 @@ const uint32_t kMemLogIntervalMs          = 60000;
 const int kNodeBlinkPeriodMs              = 3000;
 const uint32_t kSyncBlinkPeriodMs         = 5000;
 
-// ── SWARM arrival delta EMA ───────────────────────────────────────────────────
-// Samples beyond this magnitude are discarded before entering the EMA.
-const int32_t  kSwarmMaxArrivalDeltaMs    = 5000;
-
-// Clock-stability gate: after a topology change, block EMA updates until this
-// many consecutive time-sync adjustments have had |offset| below the threshold.
-// Prevents the 1–5 s transient values (clock mostly settled but not fully) from
-// entering the EMA even though they pass the ±5000 ms clamp.
-const int      kSwarmSettleAdjustments       = 3;
-const int32_t  kSwarmSettleOffsetThresholdUs = 200000;  // 200 ms
-
-// ── Scarf: sync burst after connection change ─────────────────────────────────
-// After a topology change, send kBurstSyncCount extra heartbeats at
-// kBurstSyncIntervalMs so painlessMesh has more samples for time convergence.
+// ── Scarf: burst sync after node join ────────────────────────────────────────
+// When a new node is detected, send kBurstSyncCount extra heartbeats at
+// kBurstSyncIntervalMs so the joining node converges pattern and clock quickly.
 const uint32_t kBurstSyncIntervalMs       = 500;
 const int      kBurstSyncCount            = 3;
 
+// ── ESP-NOW ───────────────────────────────────────────────────────────────────
+// All scarves must use the same channel. Channel 1 is the default; change here
+// if a less-congested channel is needed at a venue.
+const uint8_t  kEspNowChannel             = 1;
+
+// ── Mesh: node tracking ───────────────────────────────────────────────────────
+// A peer is considered gone if no heartbeat is received within this window.
+// 3 × heartbeat interval gives tolerance for two missed beats.
+const uint32_t kNodeTimeoutMs             = 15000;
+
+// ── Clock sync EMA ────────────────────────────────────────────────────────────
+// Hard-set the clock offset for the first N heartbeats received (warmup).
+// After warmup, the EMA (kSwarmEmaAlpha from swarm_ema.h) takes over.
+const int      kClockWarmupSamples        = 3;
+
+// Samples whose deviation from the current estimate exceeds this bound are
+// discarded. Guards against corrupted packets and extreme clock jumps after
+// warmup has established a baseline.
+const int32_t  kSwarmMaxClockDeviationMs  = 5000;
 
 // ── OTA ──────────────────────────────────────────────────────────────────────
-const int      kOtaHoldMs                 = 10000; // hold time for boot trigger or server-mode entry
+const int      kOtaHoldMs                 = 10000;
 const int      kOtaBootBlinkHalfPeriodMs  = 200;
 const uint32_t kOtaIdleBlinkHalfPeriodMs  = 500;
 const uint32_t kOtaConnectLedHalfPeriodMs = 150;
