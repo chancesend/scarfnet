@@ -1,6 +1,0 @@
-{
-  "name": "TaskScheduler",
-  "version": "3.8.5",
-  "description": "Cooperative multitasking for Arduino (patched: UAF fix in execute() — re-reads nextTask after callback to skip tasks deleted mid-iteration).",
-  "headers": "TaskScheduler.h"
-}

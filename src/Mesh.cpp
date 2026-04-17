@@ -1,4 +1,5 @@
 #include "Mesh.h"
+#include "config.h"
 #include "mesh_time.h"
 #include "swarm_ema.h"
 #include "log.h"
@@ -138,8 +139,9 @@ void Mesh::recordArrivalDelta(uint32_t nodeId, int32_t rawDeltaMs)
 
     // Seed new entries at 0 so the first sample is weighted by alpha rather
     // than replacing the stored value outright (see swarm_ema.h).
-    auto [it, inserted] = _nodeArrivalDeltas.emplace(nodeId, int32_t{0});
-    if (inserted)
+    auto result = _nodeArrivalDeltas.emplace(nodeId, int32_t{0});
+    auto it = result.first;
+    if (result.second)
         Scarfnet::log("[SWARM] node %u first delta: %dms", nodeId, rawDeltaMs);
 
     int32_t smoothed = swarmEmaUpdate(rawDeltaMs, it->second);

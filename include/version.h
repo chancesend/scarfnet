@@ -1,6 +1,6 @@
 #pragma once
 
-#define FIRMWARE_VERSION 4
+#define FIRMWARE_VERSION 5
 
 // HTTP Basic Auth credentials for OTA endpoints.
 // Password reuses the mesh password (kMeshPassword from login.h) so there is
