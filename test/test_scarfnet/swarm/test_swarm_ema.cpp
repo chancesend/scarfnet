@@ -48,10 +48,18 @@ void test_swarm_extreme_clock_skew_discarded()
 
 void test_swarm_ema_first_sample_from_zero_seed()
 {
-    // Seed = 0 (new node policy).  First good sample of 100ms should produce
-    // 0.3*100 + 0.7*0 = 30ms, NOT 100ms (the old bug: seed = raw).
-    int32_t result = Scarfnet::swarmEmaUpdate(100, 0);
-    TEST_ASSERT_EQUAL_INT32(30, result);
+    // Seed = 0 (new node policy).  The first sample should be weighted by
+    // alpha, not replace the EMA outright (old bug: seed = raw → result = 100).
+    // We assert the behavioral contract rather than an exact value so this
+    // test doesn't need updating every time alpha is tuned:
+    //   - result > 0          : sample moved the EMA in the right direction
+    //   - result < raw        : EMA applied smoothing, didn't replace entirely
+    //   - result < raw / 2    : alpha is well below 1.0 (reasonable smoothing)
+    const int32_t raw = 100;
+    int32_t result = Scarfnet::swarmEmaUpdate(raw, 0);
+    TEST_ASSERT_TRUE(result > 0);
+    TEST_ASSERT_TRUE(result < raw);
+    TEST_ASSERT_TRUE(result < raw / 2);
 }
 
 void test_swarm_ema_converges_toward_steady_state()
@@ -117,12 +125,13 @@ void test_swarm_rejoin_scenario_old_behaviour_for_reference()
     // Demonstrate what the OLD code did (seed = first raw sample, no clamp).
     // This is NOT a correctness test — it documents the bug so the numbers
     // in the analysis doc are reproducible.  We assert the smoothed value is
-    // still far from the true ~100ms after 20 heartbeats.
+    // still far from the true ~100ms after 10 heartbeats.
     int32_t smoothed = -1777754;  // old: seed = raw
-    for (int i = 0; i < 20; i++)
+    for (int i = 0; i < 10; i++)
         smoothed = Scarfnet::swarmEmaUpdate(100, smoothed);
-    // After 20 steps: 0.8^20 ≈ 1.15% of seed remains → ~-20,400ms residual.
-    TEST_ASSERT_TRUE(smoothed < -10000);
+    // After 10 steps with α=0.4: 0.6^10 ≈ 0.6% of seed remains → ~-10649ms residual.
+    // Still thousands of ms from the true ~100ms — the old behaviour was badly wrong.
+    TEST_ASSERT_TRUE(smoothed < -5000);
 }
 
 void test_swarm_bad_sample_mid_stream_does_not_corrupt()

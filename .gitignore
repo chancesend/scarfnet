@@ -4,3 +4,4 @@
 .vscode/extensions.json
 .DS_Store
 include/login.h
+logs/*
