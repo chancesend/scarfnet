@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include <TaskScheduler.h>
 
 #if SCARFNET_EMBEDDED
 #include <Arduino.h>

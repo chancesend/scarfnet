@@ -2,7 +2,8 @@
 
 #include "patterns.h"
 #include "palettes.h"
-#include "mesh.h"
+#include <cstdint>
+#include <memory>
 
 namespace Scarfnet
 {
@@ -24,9 +25,9 @@ public:
     void runCurrentPattern(Leds& leds, uint32_t nodeTimeMs);
 
     // Advances to the next pattern and updates the randomizer seed from the press timestamp.
-    void incrementPattern(Mesh::TimeMs lastSelfPressMs);
+    void incrementPattern(uint32_t lastSelfPressMs);
     // Keeps the current pattern but re-seeds the randomizer for a different look.
-    void samePatternDifferentRandomizer(Mesh::TimeMs lastSelfPressMs);
+    void samePatternDifferentRandomizer(uint32_t lastSelfPressMs);
     // Switches to the named pattern with the given randomizer (used when syncing from a remote node).
     void changePatternFromString(const std::string& pattern, Rnd randomizer);
 
