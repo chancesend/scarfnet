@@ -49,9 +49,9 @@ void test_swarm_extreme_clock_skew_discarded()
 void test_swarm_ema_first_sample_from_zero_seed()
 {
     // Seed = 0 (new node policy).  First good sample of 100ms should produce
-    // 0.2*100 + 0.8*0 = 20ms, NOT 100ms (the old bug: seed = raw).
+    // 0.3*100 + 0.7*0 = 30ms, NOT 100ms (the old bug: seed = raw).
     int32_t result = Scarfnet::swarmEmaUpdate(100, 0);
-    TEST_ASSERT_EQUAL_INT32(20, result);
+    TEST_ASSERT_EQUAL_INT32(30, result);
 }
 
 void test_swarm_ema_converges_toward_steady_state()

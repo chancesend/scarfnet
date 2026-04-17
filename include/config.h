@@ -20,11 +20,14 @@ const uint32_t kSyncBlinkPeriodMs         = 5000;
 
 // ── SWARM arrival delta EMA ───────────────────────────────────────────────────
 // Samples beyond this magnitude are discarded before entering the EMA.
-// Prevents a freshly-rebooted node's unsettled clock from poisoning the
-// smoothed value with a multi-minute initial error.  5000ms is generous enough
-// to cover several mesh hops while still rejecting the seconds-to-minutes
-// errors that appear during clock convergence after rejoin.
 const int32_t  kSwarmMaxArrivalDeltaMs    = 5000;
+
+// Clock-stability gate: after a topology change, block EMA updates until this
+// many consecutive time-sync adjustments have had |offset| below the threshold.
+// Prevents the 1–5 s transient values (clock mostly settled but not fully) from
+// entering the EMA even though they pass the ±5000 ms clamp.
+const int      kSwarmSettleAdjustments       = 3;
+const int32_t  kSwarmSettleOffsetThresholdUs = 200000;  // 200 ms
 
 // ── Scarf: sync burst after connection change ─────────────────────────────────
 // After a topology change, send kBurstSyncCount extra heartbeats at

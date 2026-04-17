@@ -14,14 +14,12 @@ void setup()
 {
     Serial.begin(115200);
 
-    Scarfnet::log("setup() 1");
     Scheduler userScheduler;
 
     Scarfnet::MeshConnection connection;
     connection.ssid = kMeshSSID;
     connection.password = kMeshPassword;
     connection.port = kMeshPort;
-    Scarfnet::log("setup() 2");
     scarf.setup();
 }
 
