@@ -19,8 +19,12 @@ namespace Scarfnet
 // raw delta for that first heartbeat is therefore wildly wrong.  Without
 // protection, it poisons the EMA and takes ~80 heartbeats to wash out.
 
-// Alpha for the EMA: each new sample contributes 30% of the updated value.
-constexpr float kSwarmEmaAlpha = 0.3f;
+// Alpha for the EMA: each new sample contributes 40% of the updated value.
+// Converges to within ~8% of true value in 5 heartbeats (~25s) after the
+// clock-stability gate clears.  Higher values give diminishing convergence
+// returns while adding linearly more steady-state noise (see analysis in
+// docs/plan-swarm-ema-convergence.md).
+constexpr float kSwarmEmaAlpha = 0.4f;
 
 // Returns true if rawDeltaMs is within the plausible range (i.e. the sample
 // should be fed into the EMA), false if it should be discarded.
