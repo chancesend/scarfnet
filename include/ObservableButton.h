@@ -1,25 +1,29 @@
 #pragma once
 
 #include "defines.h"
+#include "button_state_machine.h"
+
 #include <TaskScheduler.h>
 
 #if SCARFNET_EMBEDDED
 #include <Arduino.h>
 #include <M5Stack.h>
-
-//#define FASTLED_INTERNAL (1)
 #include <FastLED.h>
 #endif
 
 #include <list>
 #include <stdint.h>
 #include <functional>
+#include <vector>
 
 namespace Scarfnet
 {
 
 // Polls a hardware button on a TaskScheduler task and classifies presses into
 // discrete events. Observers are notified synchronously on the scheduler task.
+//
+// The state machine logic lives in ButtonStateMachine (button_state_machine.h)
+// and is unit-tested independently. This class is the hardware glue layer.
 class ObservableButton
 {
 public:
@@ -32,15 +36,6 @@ public:
     };
     typedef std::function<void(const Event&)> EventCallback_t;
 
-    enum ButtonState
-    {
-        kButtonState_Up = 0,
-        kButtonState_Pressed,
-        kButtonState_LongPressed,
-        kButtonState_DoublePressed,
-        kButtonState_ExtraLongPressed,
-    };
-
     ObservableButton(Scheduler* scheduler, uint8_t buttonPin);
 
     // Registers a callback invoked on each button event.
@@ -50,7 +45,7 @@ public:
     }
     void onEvent(const Event& event)
     {
-        for(const auto& observer: _observers)
+        for (const auto& observer : _observers)
         {
             observer(event);
         }
@@ -63,7 +58,7 @@ private:
     void checkButtonEvent();
 
     Task _taskCheckButtonEvent;
-    ButtonState _buttonState = kButtonState_Up;
+    ButtonStateMachine _sm;
     Button _button;
 
     typedef std::vector<EventCallback_t> MyObserverList;
@@ -71,4 +66,4 @@ private:
     Scheduler* _scheduler;
 };
 
-};
+}
