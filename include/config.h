@@ -25,9 +25,17 @@ const uint32_t kBurstSyncIntervalMs       = 500;
 const int      kBurstSyncCount            = 3;
 
 // ── ESP-NOW ───────────────────────────────────────────────────────────────────
-// All scarves must use the same channel. Channel 1 is the default; change here
-// if a less-congested channel is needed at a venue.
-const uint8_t  kEspNowChannel             = 1;
+// All scarves must use the same channel. Channel 6 avoids overlap with channels
+// 1 and 11 (the other common non-overlapping 2.4 GHz channels).
+const uint8_t  kEspNowChannel             = 6;
+
+// ── ScarfNet identity ────────────────────────────────────────────────────────
+// Logical network ID stamped on every heartbeat. Packets from a different ID
+// are silently dropped. Eventually this will be settable per-device from
+// Preferences (call Mesh::setScarfNetId() at startup after loading). For now
+// the compile-time default is used by all scarves.
+// 0x5343524E = "SCRN" in ASCII.
+const uint32_t kDefaultScarfNetId         = 0x5343524E;
 
 // ── Mesh: node tracking ───────────────────────────────────────────────────────
 // A peer is considered gone if no heartbeat is received within this window.
