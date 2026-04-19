@@ -5,14 +5,37 @@
 namespace Scarfnet
 {
 
-ObservableButton::ObservableButton(Scheduler *scheduler, uint8_t buttonPin)
+#if SCARFNET_EMBEDDED
+ObservableButton::ObservableButton(Scheduler* scheduler, uint8_t buttonPin)
     : _scheduler(scheduler),
       _button(buttonPin, 1, 10),
+      _pollFn([this]() -> ButtonReading {
+          // read() MUST be called first to latch the current pin state.
+          // It is baked into this lambda so it cannot be accidentally omitted.
+          _button.read();
+          return ButtonReading{
+              _button.wasPressed(),
+              _button.pressedFor(kLongPressMs),
+              _button.pressedFor(kExtraLongPressMs),
+              _button.wasReleased()
+          };
+      }),
       _taskCheckButtonEvent(kButtonPollIntervalMs, TASK_FOREVER,
-                            [&]() { this->checkButtonEvent(); })
+                            [this]() { this->checkButtonEvent(); })
 {
     Scarfnet::log("ObservableButton::ObservableButton()");
 }
+#endif
+
+#if !SCARFNET_EMBEDDED
+ObservableButton::ObservableButton(Scheduler* scheduler, PollFn pollFn)
+    : _scheduler(scheduler),
+      _pollFn(std::move(pollFn)),
+      _taskCheckButtonEvent(kButtonPollIntervalMs, TASK_FOREVER,
+                            [this]() { this->checkButtonEvent(); })
+{
+}
+#endif
 
 void ObservableButton::setup()
 {
@@ -22,12 +45,9 @@ void ObservableButton::setup()
 
 void ObservableButton::checkButtonEvent()
 {
-    auto smEvent = _sm.update(
-        _button.wasPressed(),
-        _button.pressedFor(kLongPressMs),
-        _button.pressedFor(kExtraLongPressMs),
-        _button.wasReleased()
-    );
+    const ButtonReading reading = _pollFn();
+
+    const auto smEvent = _sm.update(reading);
 
     switch (smEvent) {
         case ButtonStateMachine::Event::Press:

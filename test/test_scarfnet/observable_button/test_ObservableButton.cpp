@@ -1,7 +1,10 @@
 #include <unity.h>
 #include <button_state_machine.h>
 
+#include <vector>
+
 using Scarfnet::ButtonStateMachine;
+using Scarfnet::ButtonReading;
 using State = ButtonStateMachine::State;
 using Event = ButtonStateMachine::Event;
 
@@ -9,7 +12,7 @@ using Event = ButtonStateMachine::Event;
 static Event tick(ButtonStateMachine& sm,
                   bool pressed = false, bool longHeld = false,
                   bool extraLongHeld = false, bool released = false) {
-    return sm.update(pressed, longHeld, extraLongHeld, released);
+    return sm.update(ButtonReading{pressed, longHeld, extraLongHeld, released});
 }
 
 // ─── Initial state ───────────────────────────────────────────────────────────

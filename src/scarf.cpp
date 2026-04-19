@@ -54,7 +54,7 @@ void Scarf::onNodeJoined(Mesh::NodeId nodeId)
 {
     Scarfnet::log("[SCARF] node %u joined (%u peers)", nodeId, (unsigned)_mesh->nodeCount());
     _blinkNoNodes.setIterations((int)_mesh->nodeCount() * 2);
-    uint32_t msToNextSync = kNodeBlinkPeriodMs - (_mesh->timeMs() % kNodeBlinkPeriodMs);
+    TimeMs msToNextSync = kNodeBlinkPeriodMs - (_mesh->timeMs() % kNodeBlinkPeriodMs);
     _blinkNoNodes.enableDelayed(msToNextSync);
 
     // Burst sync so the joining node converges pattern and clock quickly.
@@ -108,8 +108,8 @@ void Scarf::setup()
     _mesh = make_unique<Mesh>();
     _mesh->begin();
     _mesh->onReceived([this](const HeartbeatPacket& pkt) { onReceived(pkt); });
-    _mesh->onNodeJoined([this](uint32_t id) { onNodeJoined(id); });
-    _mesh->onNodeLeft( [this](uint32_t id) { onNodeLeft(id); });
+    _mesh->onNodeJoined([this](NodeId id) { onNodeJoined(id); });
+    _mesh->onNodeLeft( [this](NodeId id) { onNodeLeft(id); });
 
     _nextPatternButton.setup();
     _nextPatternButton.addObserver([this](const ObservableButton::Event& event)
@@ -237,7 +237,7 @@ void Scarf::blinkNumNodes()
     if (_blinkNoNodes.isLastIteration())
     {
         _blinkNoNodes.setIterations((int)_mesh->nodeCount() * 2);
-        uint32_t msToNextBlinkSync = kNodeBlinkPeriodMs -
+        TimeMs msToNextBlinkSync = kNodeBlinkPeriodMs -
             (_mesh->timeMs() % kNodeBlinkPeriodMs);
         _blinkNoNodes.enableDelayed(msToNextBlinkSync);
     }

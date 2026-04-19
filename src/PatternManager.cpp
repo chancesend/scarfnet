@@ -21,7 +21,7 @@ std::string PatternManager::getCurrentPattern()
     return _currentPattern->first;
 }
 
-void PatternManager::runCurrentPattern(Leds& leds, uint32_t nodeTimeMs)
+void PatternManager::runCurrentPattern(Leds& leds, TimeMs nodeTimeMs)
 {
     _currentPattern->second(
         leds,
@@ -37,7 +37,7 @@ void PatternManager::initPatterns()
     _currentPattern = _patterns.begin();
 }
 
-void PatternManager::incrementPattern(uint32_t lastSelfPressMs)
+void PatternManager::incrementPattern(TimeMs lastSelfPressMs)
 {
     auto newPattern = _currentPattern + 1;
     if (newPattern == _patterns.end())
@@ -50,7 +50,7 @@ void PatternManager::incrementPattern(uint32_t lastSelfPressMs)
     changePatternFromString(newPattern->first, randomizer);
 }
 
-void PatternManager::samePatternDifferentRandomizer(uint32_t lastSelfPressMs)
+void PatternManager::samePatternDifferentRandomizer(TimeMs lastSelfPressMs)
 {
     auto newPattern = _currentPattern;
     const auto newName = newPattern->first.c_str();

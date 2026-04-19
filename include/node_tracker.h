@@ -21,7 +21,7 @@ struct NodeTracker {
 
     // Record a heartbeat from `nodeId` at local time `nowMs`.
     // Returns true if this is the first heartbeat from this node (join event).
-    bool saw(NodeId nodeId, uint32_t nowMs) {
+    bool saw(NodeId nodeId, TimeMs nowMs) {
         bool isNew = (_peers.find(nodeId) == _peers.end());
         _peers[nodeId] = nowMs;
         return isNew;
@@ -29,7 +29,7 @@ struct NodeTracker {
 
     // Erase peers whose last-seen time is more than `timeoutMs` ago.
     // Calls `leaveCb` for each removed peer. Returns the number removed.
-    int checkTimeouts(uint32_t nowMs, uint32_t timeoutMs, const LeaveCb& leaveCb) {
+    int checkTimeouts(TimeMs nowMs, TimeMs timeoutMs, const LeaveCb& leaveCb) {
         int removed = 0;
         for (auto it = _peers.begin(); it != _peers.end(); ) {
             if (nowMs - it->second > timeoutMs) {
@@ -47,7 +47,7 @@ struct NodeTracker {
     size_t count() const { return _peers.size(); }
 
 private:
-    std::unordered_map<NodeId, uint32_t> _peers;  // nodeId → lastSeenMs
+    std::unordered_map<NodeId, TimeMs> _peers;  // nodeId → lastSeenMs
 };
 
 } // namespace Scarfnet

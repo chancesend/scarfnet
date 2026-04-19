@@ -1,5 +1,6 @@
 #pragma once
 
+#include "mesh_types.h" // TimeMs
 #include "patterns.h"
 #include "palettes.h"
 #include <cstdint>
@@ -22,12 +23,12 @@ public:
     std::string getCurrentPattern();
 
     // Renders the current pattern into leds using the given mesh timestamp.
-    void runCurrentPattern(Leds& leds, uint32_t nodeTimeMs);
+    void runCurrentPattern(Leds& leds, TimeMs nodeTimeMs);
 
     // Advances to the next pattern and updates the randomizer seed from the press timestamp.
-    void incrementPattern(uint32_t lastSelfPressMs);
+    void incrementPattern(TimeMs lastSelfPressMs);
     // Keeps the current pattern but re-seeds the randomizer for a different look.
-    void samePatternDifferentRandomizer(uint32_t lastSelfPressMs);
+    void samePatternDifferentRandomizer(TimeMs lastSelfPressMs);
     // Switches to the named pattern with the given randomizer (used when syncing from a remote node).
     void changePatternFromString(const std::string& pattern, Rnd randomizer);
 
