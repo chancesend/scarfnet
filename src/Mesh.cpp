@@ -126,8 +126,8 @@ void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
         return;
     }
 
-    NodeId   nodeId = macToNodeId(mac);
-    uint32_t now    = millis();
+    NodeId nodeId = macToNodeId(mac);
+    TimeMs now    = millis();
 
     bool isNew = _tracker.saw(nodeId, now);
     updateClock(pkt.currentTimeMs);

@@ -11,8 +11,9 @@
 #include <stdint.h>
 #include <cmath>
 
-#include "config.h"    // kClockWarmupSamples, kSwarmMaxClockDeviationMs
-#include "swarm_ema.h" // kSwarmEmaAlpha
+#include "config.h"     // kClockWarmupSamples, kSwarmMaxClockDeviationMs
+#include "mesh_types.h" // TimeMs
+#include "swarm_ema.h"  // kSwarmEmaAlpha
 
 namespace Scarfnet {
 
@@ -22,7 +23,7 @@ struct ClockSync {
 
     // Feed one received peer timestamp. localMs should be millis() at the
     // moment the packet was processed (not when it was received by the ISR).
-    void update(uint32_t peerTimeMs, uint32_t localMs) {
+    void update(TimeMs peerTimeMs, TimeMs localMs) {
         int32_t rawDelta = (int32_t)peerTimeMs - (int32_t)localMs;
 
         if (samples < kClockWarmupSamples) {
@@ -44,8 +45,8 @@ struct ClockSync {
     }
 
     // Synchronized time given the current local millis() value.
-    uint32_t timeMs(uint32_t localMs) const {
-        return (uint32_t)((int32_t)localMs + (int32_t)offset);
+    TimeMs timeMs(TimeMs localMs) const {
+        return (TimeMs)((int32_t)localMs + (int32_t)offset);
     }
 
     bool isWarmedUp() const { return samples >= kClockWarmupSamples; }
