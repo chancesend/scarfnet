@@ -8,7 +8,8 @@
 
 namespace Scarfnet {
 
-using NodeId = uint32_t;  // last 4 MAC bytes — stable peer identifier
-using TimeMs = uint32_t;  // synchronized millisecond clock value
+using NodeId      = uint32_t;  // last 4 MAC bytes — stable peer identifier
+using TimeMs      = uint32_t;  // synchronized millisecond clock value
+using ScarfNetId  = uint32_t;  // logical network identifier; scarves drop packets from other IDs
 
 } // namespace Scarfnet

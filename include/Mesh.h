@@ -11,7 +11,8 @@
 #include <functional>
 #include <cstdint>
 
-#include "mesh_types.h"       // NodeId, TimeMs
+#include "config.h"           // kDefaultScarfNetId
+#include "mesh_types.h"       // NodeId, TimeMs, ScarfNetId
 #include "sync.h"             // ChangeIndex
 #include "clock_sync.h"       // ClockSync
 #include "heartbeat_packet.h" // HeartbeatPacket
@@ -68,6 +69,10 @@ public:
     void onNodeJoined(NodeCb cb)     { _joinedCb   = std::move(cb); }
     void onNodeLeft(NodeCb cb)       { _leftCb     = std::move(cb); }
 
+    // Override the logical network ID (default: kDefaultScarfNetId from config.h).
+    // Call at startup after loading from Preferences to join a specific ScarfNet.
+    void setScarfNetId(ScarfNetId id) { _scarfNetId = id; }
+
 private:
     // ESP-NOW recv callback — runs on the WiFi task; enqueues to ring buffer.
     static void espNowRecvCb(const uint8_t* mac, const uint8_t* data, int len);
@@ -78,7 +83,8 @@ private:
 
     static NodeId macToNodeId(const uint8_t* mac);
 
-    NodeId      _nodeId  = 0;
+    NodeId      _nodeId     = 0;
+    ScarfNetId  _scarfNetId = kDefaultScarfNetId;
     ClockSync   _clock;    // EMA clock offset
     NodeTracker _tracker;  // peer map + join/leave synthesis
 

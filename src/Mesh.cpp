@@ -126,6 +126,12 @@ void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
         return;
     }
 
+    if (pkt.scarfNetId != _scarfNetId) {
+        Scarfnet::log("[MESH][RCV] scarfNetId mismatch (got %u, ours %u) — dropped",
+                      pkt.scarfNetId, _scarfNetId);
+        return;
+    }
+
     NodeId nodeId = macToNodeId(mac);
     TimeMs now    = millis();
 
@@ -169,8 +175,10 @@ void Mesh::updateClock(TimeMs pktCurrentTimeMs) {
 // ─── Send ───────────────────────────────────────────────────────────────────
 
 void Mesh::broadcast(const HeartbeatPacket& pkt) {
+    HeartbeatPacket stamped = pkt;
+    stamped.scarfNetId = _scarfNetId;
     int wireLen = 0;
-    const uint8_t* wireData = HeartbeatFramer::encode(pkt, wireLen);
+    const uint8_t* wireData = HeartbeatFramer::encode(stamped, wireLen);
     esp_err_t result = esp_now_send(kBroadcastMac, wireData, (size_t)wireLen);
     if (result != ESP_OK) {
         Scarfnet::log("[MESH][SND] esp_now_send error %d", (int)result);
