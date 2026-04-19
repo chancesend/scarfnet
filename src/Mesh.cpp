@@ -3,7 +3,7 @@
 #ifdef SCARFNET_EMBEDDED
 
 #include "config.h"
-#include "swarm_ema.h"
+#include "clock_sync.h"
 #include "log.h"
 
 #include <WiFi.h>
@@ -27,7 +27,7 @@ static constexpr uint8_t kBroadcastMac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
 }
 
 Mesh::TimeMs Mesh::timeMs() const {
-    return (Mesh::TimeMs)((int32_t)millis() + (int32_t)_clockOffset);
+    return _clock.timeMs(millis());
 }
 
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
@@ -88,7 +88,10 @@ void Mesh::update() {
         handleReceived(entry.mac, entry.data, entry.len);
     }
 
-    checkNodeTimeouts();
+    _tracker.checkTimeouts(millis(), kNodeTimeoutMs, [this](NodeId nodeId) {
+        Scarfnet::log("[MESH] node %u timed out (peers: %u)", nodeId, (unsigned)_tracker.count());
+        if (_leftCb) _leftCb(nodeId);
+    });
 }
 
 // ─── ESP-NOW callback (WiFi task) ───────────────────────────────────────────
@@ -117,84 +120,58 @@ void Mesh::update() {
 // ─── Receive (loop task) ────────────────────────────────────────────────────
 
 void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
-    if (len < (int)sizeof(HeartbeatPacket)) {
+    HeartbeatPacket pkt = {};
+    if (!HeartbeatFramer::decode(data, len, pkt)) {
         Scarfnet::log("[MESH][RCV] short packet (%d bytes) — ignoring", len);
         return;
     }
 
-    HeartbeatPacket pkt;
-    memcpy(&pkt, data, sizeof(HeartbeatPacket));
-    pkt.pattern[sizeof(pkt.pattern) - 1] = '\0';  // guard against unterminated data
-
-    uint32_t nodeId = macToNodeId(mac);
+    NodeId   nodeId = macToNodeId(mac);
     uint32_t now    = millis();
 
-    bool isNew = (_peers.find(nodeId) == _peers.end());
-    _peers[nodeId].lastSeenMs = now;
-
+    bool isNew = _tracker.saw(nodeId, now);
     updateClock(pkt.currentTimeMs);
 
     Scarfnet::log("[MESH][RCV node %u] pattern=%s ci=%u peerTime=%u myTime=%u",
                   nodeId, pkt.pattern, pkt.changeIndex, pkt.currentTimeMs, timeMs());
 
     if (isNew) {
-        Scarfnet::log("[MESH] node %u joined (peers: %u)", nodeId, (unsigned)_peers.size());
+        Scarfnet::log("[MESH] node %u joined (peers: %u)", nodeId, (unsigned)_tracker.count());
         if (_joinedCb) _joinedCb(nodeId);
     }
 
     if (_receivedCb) _receivedCb(pkt);
 }
 
-void Mesh::checkNodeTimeouts() {
-    uint32_t now = millis();
-    for (auto it = _peers.begin(); it != _peers.end(); ) {
-        if (now - it->second.lastSeenMs > kNodeTimeoutMs) {
-            uint32_t nodeId = it->first;
-            Scarfnet::log("[MESH] node %u timed out (peers: %u)", nodeId, (unsigned)_peers.size() - 1);
-            it = _peers.erase(it);
-            if (_leftCb) _leftCb(nodeId);
-        } else {
-            ++it;
-        }
-    }
-}
-
 // ─── Clock sync ─────────────────────────────────────────────────────────────
 
 void Mesh::updateClock(TimeMs pktCurrentTimeMs) {
-    // rawDelta = how far our millis() lags behind the peer's synced time.
-    // Positive → peer is ahead; negative → peer is behind.
-    int32_t rawDelta = (int32_t)pktCurrentTimeMs - (int32_t)millis();
+    int32_t rawDelta  = (int32_t)pktCurrentTimeMs - (int32_t)millis();
+    bool    wasWarmed = _clock.isWarmedUp();
+    _clock.update(pktCurrentTimeMs, millis());
 
-    if (_clockSamples < kClockWarmupSamples) {
-        // Hard-set during warmup so a freshly-booted node converges immediately,
-        // even when the offset is orders of magnitude larger than the EMA window.
-        _clockOffset = (float)rawDelta;
-        _clockSamples++;
+    if (!wasWarmed) {
         Scarfnet::log("[SYNC] warmup %d/%d offset=%dms",
-                      _clockSamples, kClockWarmupSamples, rawDelta);
+                      _clock.samples, kClockWarmupSamples, rawDelta);
         return;
     }
 
-    // After warmup, only accept samples within ±kSwarmMaxClockDeviationMs of the
-    // current estimate to guard against corrupted packets or extreme clock jumps.
-    float deviation = fabsf((float)rawDelta - _clockOffset);
+    float deviation = fabsf((float)rawDelta - _clock.offset);
     if (deviation > (float)kSwarmMaxClockDeviationMs) {
         Scarfnet::log("[SYNC] deviation=%.0fms exceeds ±%dms — discarded",
                       deviation, kSwarmMaxClockDeviationMs);
         return;
     }
 
-    _clockOffset = kSwarmEmaAlpha * (float)rawDelta + (1.0f - kSwarmEmaAlpha) * _clockOffset;
-    Scarfnet::log("[SYNC] offset=%.0fms raw=%dms", _clockOffset, rawDelta);
+    Scarfnet::log("[SYNC] offset=%.0fms raw=%dms", _clock.offset, rawDelta);
 }
 
 // ─── Send ───────────────────────────────────────────────────────────────────
 
 void Mesh::broadcast(const HeartbeatPacket& pkt) {
-    esp_err_t result = esp_now_send(kBroadcastMac,
-                                    reinterpret_cast<const uint8_t*>(&pkt),
-                                    sizeof(HeartbeatPacket));
+    int wireLen = 0;
+    const uint8_t* wireData = HeartbeatFramer::encode(pkt, wireLen);
+    esp_err_t result = esp_now_send(kBroadcastMac, wireData, (size_t)wireLen);
     if (result != ESP_OK) {
         Scarfnet::log("[MESH][SND] esp_now_send error %d", (int)result);
     }

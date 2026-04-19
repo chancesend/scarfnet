@@ -9,44 +9,32 @@
 #include <esp_now.h>
 #include <freertos/portmacro.h>
 #include <functional>
-#include <unordered_map>
 #include <cstdint>
 
+#include "mesh_types.h"       // NodeId, TimeMs
+#include "sync.h"             // ChangeIndex
+#include "clock_sync.h"       // ClockSync
+#include "heartbeat_packet.h" // HeartbeatPacket
+#include "heartbeat_framer.h" // HeartbeatFramer
+#include "node_tracker.h"     // NodeTracker
 #include "log.h"
-#include "sync.h"  // for ChangeIndex
 
 namespace Scarfnet {
-
-// ── Namespace-level type aliases ─────────────────────────────────────────────
-// Defined here so HeartbeatPacket (which lives outside the Mesh class) can use
-// them. Mesh re-exports these as class aliases so Mesh::TimeMs / Mesh::NodeId
-// also work.
-using NodeId = uint32_t;  // last 4 MAC bytes as a stable peer identifier
-using TimeMs = uint32_t;  // synchronized millisecond clock value
-// ChangeIndex is defined in sync.h (same namespace)
-
-// ── Wire format ──────────────────────────────────────────────────────────────
-
-// Packed heartbeat broadcast over ESP-NOW. Well under the 250-byte limit.
-// Current size: 4+4+4+4+1+33 = 50 bytes.
-struct __attribute__((packed)) HeartbeatPacket {
-    NodeId      id;             // sender node ID (last 4 MAC bytes cast to uint32)
-    TimeMs      lastPress;      // synchronized time of last button press on sender
-    TimeMs      currentTimeMs;  // sender's synchronized clock (millis() + EMA offset)
-    ChangeIndex changeIndex;    // monotonic pattern-change counter
-    Rnd         randomizer;     // pattern seed (low byte of lastPress)
-    char        pattern[33];    // null-terminated pattern name, max 32 chars
-};
-static_assert(sizeof(HeartbeatPacket) <= 250, "HeartbeatPacket exceeds ESP-NOW 250-byte limit");
 
 // ── Mesh class ───────────────────────────────────────────────────────────────
 
 // Connectionless mesh over ESP-NOW broadcast. Each node broadcasts heartbeats
 // to FF:FF:FF:FF:FF:FF every kHeartbeatIntervalMs. Join/leave events are
 // synthesised from the heartbeat stream via timeout tracking.
+//
+// Transport concerns are delegated to standalone units:
+//   NodeTracker     — peer map, join/leave synthesis  (include/node_tracker.h)
+//   ClockSync       — EMA clock offset                (include/clock_sync.h)
+//   HeartbeatFramer — packet encode/decode            (include/heartbeat_framer.h)
 class Mesh {
 public:
-    // Re-exported so Mesh::TimeMs and Mesh::NodeId remain valid access paths.
+    // Re-exported so Mesh::TimeMs / Mesh::NodeId / Mesh::ChangeIndex remain
+    // valid access paths for callers that already use those qualified names.
     using TimeMs      = Scarfnet::TimeMs;
     using NodeId      = Scarfnet::NodeId;
     using ChangeIndex = Scarfnet::ChangeIndex;
@@ -70,7 +58,7 @@ public:
     TimeMs timeMs()    const;
 
     // Number of peer nodes currently tracked (excludes self).
-    size_t nodeCount() const { return _peers.size(); }
+    size_t nodeCount() const { return _tracker.count(); }
 
     // Broadcast a heartbeat packet to all ESP-NOW peers on kEspNowChannel.
     void broadcast(const HeartbeatPacket& pkt);
@@ -85,18 +73,14 @@ private:
     static void espNowRecvCb(const uint8_t* mac, const uint8_t* data, int len);
     // Processes one received packet on the loop task.
     void handleReceived(const uint8_t* mac, const uint8_t* data, int len);
-    void checkNodeTimeouts();
-    // Update EMA clock offset from a peer's reported time.
+    // Update EMA clock offset from a peer's reported time, with logging.
     void updateClock(TimeMs pktCurrentTimeMs);
 
     static NodeId macToNodeId(const uint8_t* mac);
 
-    NodeId _nodeId       = 0;
-    float  _clockOffset  = 0.0f;  // timeMs() = millis() + (int32_t)_clockOffset
-    int    _clockSamples = 0;     // hard-set during warmup, EMA after
-
-    struct PeerState { uint32_t lastSeenMs; };
-    std::unordered_map<NodeId, PeerState> _peers;
+    NodeId      _nodeId  = 0;
+    ClockSync   _clock;    // EMA clock offset
+    NodeTracker _tracker;  // peer map + join/leave synthesis
 
     ReceivedCb _receivedCb;
     NodeCb     _joinedCb;
