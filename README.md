@@ -108,10 +108,9 @@ The type is toggled via extra-long press and survives reboots.
 | File | Purpose |
 |---|---|
 | `include/login.h` | **Gitignored.** Mesh SSID, password, and port. Must be created locally. |
-| `include/config.h` | All timing constants (button thresholds, LED refresh, heartbeat interval, OTA timings, etc.). Single source of truth — never hard-code timing values elsewhere. |
-| `include/version.h` | `FIRMWARE_VERSION` (integer, increment before OTA flashing) and `OTA_HTTP_USER`. |
+| `include/config.h` | All timing constants, `kScarfVersion` (increment before OTA flashing), and `kOtaHttpUser`. Single source of truth — never hard-code timing values elsewhere. |
 | `include/defines.h` | Pin assignments, LED count, LED type enums, `SCARFNET_EMBEDDED` compile guard. |
-| `include/typedefs.h` | Core type aliases: `Leds` (`std::vector<CRGB>`) and `Rnd` (`uint8_t`). |
+| `include/typedefs.h` | Core type aliases: `Leds` (`std::vector<CRGB>`) and `Rnd` (`uint16_t`). |
 
 ## Python Tooling
 

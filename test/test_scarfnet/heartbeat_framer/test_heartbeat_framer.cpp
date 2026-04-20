@@ -40,7 +40,7 @@ void test_framer_decode_exact_size_succeeds()
     TEST_ASSERT_EQUAL_UINT32(9999,       out.lastPress);
     TEST_ASSERT_EQUAL_UINT32(100000,     out.currentTimeMs);
     TEST_ASSERT_EQUAL_UINT32(7,          out.changeIndex);
-    TEST_ASSERT_EQUAL_UINT8(42,          out.randomizer);
+    TEST_ASSERT_EQUAL_UINT16(42,         out.randomizer);
     TEST_ASSERT_EQUAL_STRING("pride",    out.pattern);
 }
 
@@ -123,7 +123,7 @@ void test_framer_round_trip_preserves_all_fields()
     TEST_ASSERT_EQUAL_UINT32(orig.lastPress,     decoded.lastPress);
     TEST_ASSERT_EQUAL_UINT32(orig.currentTimeMs, decoded.currentTimeMs);
     TEST_ASSERT_EQUAL_UINT32(orig.changeIndex,   decoded.changeIndex);
-    TEST_ASSERT_EQUAL_UINT8 (orig.randomizer,    decoded.randomizer);
+    TEST_ASSERT_EQUAL_UINT16(orig.randomizer,    decoded.randomizer);
     TEST_ASSERT_EQUAL_STRING(orig.pattern,       decoded.pattern);
 }
 
