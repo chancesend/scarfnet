@@ -2,7 +2,7 @@
 
 namespace Scarfnet {
 
-void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette)
+void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat)
 {
     static uint16_t sPseudotime = 0;
     static uint16_t sLastMillis = 0;
@@ -38,6 +38,15 @@ void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette)
 
         uint16_t pixelnumber = (kNumLeds - 1) - i;
         nblend(leds[pixelnumber], newcolor, 64);
+    }
+
+    // On-beat white flash: blend all LEDs toward white, fading over ~60ms.
+    if (beat.isActive()) {
+        uint8_t flash = beat.flashBrightness();
+        if (flash > 0) {
+            for (auto& led : leds)
+                led = blend(led, CRGB::White, flash);
+        }
     }
 }
 

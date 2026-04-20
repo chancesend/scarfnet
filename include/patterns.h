@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "tap_tempo.h"  // BeatInfo
 
 #include <stdint.h>
 #include <string>
@@ -8,7 +9,7 @@
 namespace Scarfnet
 {
 
-typedef std::function<void(Leds&, int32_t, CRGBPalette16, Rnd)> PatternFcn;
+typedef std::function<void(Leds&, int32_t, CRGBPalette16, Rnd, const BeatInfo&)> PatternFcn;
 typedef std::pair<std::string, PatternFcn> NamedPattern;
 typedef std::vector<NamedPattern> PatternList;
 
@@ -33,7 +34,7 @@ inline fract8 timeFrac8(int time, int period) {
 
 // ── Pattern render functions (implemented in src/patterns/*.cpp) ─────────────
 
-void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette);
+void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat);
 void confetti(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t fade, uint8_t popChancePct);
 void firework(Leds& leds, int32_t timeMs, int periodMs, const CRGBPalette16& palette);
 void colorwaves(Leds& leds, int32_t timeMs, const CRGBPalette16& palette);

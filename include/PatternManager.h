@@ -22,8 +22,8 @@ public:
     // Returns the name of the currently active pattern.
     std::string getCurrentPattern();
 
-    // Renders the current pattern into leds using the given mesh timestamp.
-    void runCurrentPattern(Leds& leds, TimeMs nodeTimeMs);
+    // Renders the current pattern into leds using the given mesh timestamp and beat state.
+    void runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const BeatInfo& beat);
 
     // Advances to the next pattern and updates the randomizer seed from the press timestamp.
     void incrementPattern(TimeMs lastSelfPressMs);

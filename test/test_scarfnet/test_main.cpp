@@ -8,6 +8,7 @@
 #include "patterns/test_patterns.h"
 #include "swarm/test_swarm_ema.h"
 #include "sync/test_sync.h"
+#include "tap_tempo/test_tap_tempo.h"
 
 void setUp(void) {
     // set stuff up here
@@ -33,6 +34,7 @@ int main( int argc, char **argv) {
     patterns_tests();
     swarm_ema_tests();
     sync_tests();
+    tap_tempo_tests();
     
     UNITY_END();
 }
