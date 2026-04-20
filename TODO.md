@@ -29,7 +29,10 @@
 - [ ] More patterns! At least 8
     * Patterns should be based more on common mesh time, so we see sync
 - [ ] Make sure that when pattern and time updates are received from other scarves, the local scarf's pattern is blended over the course of a second or two, rather than have a hard swap
-- [ ] How can we do a tap-tempo to time patterns with external music?
+
+## Party mode (tap-tempo) ideas
+- [ ] For tap-tempo mode, we should take our tempo taps on the press of the button, not the release
+
 
 ## Log Visualizations
 
