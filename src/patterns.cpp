@@ -31,18 +31,21 @@ PatternList getPatternList()
 
     patterns.push_back({"colorwaves", [](Leds& leds, const PatternContext& ctx) {
         colorwaves(leds, ctx.timeMs, ctx.palette);
-        // Subtle brightness swell on the beat — gentler than pride's full flash.
+        // Palette-colored swell on the beat — hue from rnd so each fleet session
+        // gets a distinct accent color rather than always washing to white.
         if (ctx.beat.isActive()) {
             uint8_t flash = ctx.beat.flashBrightness(80);
-            if (flash > 0)
-                for (auto& led : leds) led = blend(led, CRGB::White, flash >> 2);
+            if (flash > 0) {
+                CRGB flashColor = ColorFromPalette(ctx.palette, (uint8_t)(ctx.rnd * 17u >> 8), 255, LINEARBLEND);
+                for (auto& led : leds) led = blend(led, flashColor, flash >> 2);
+            }
         }
     }});
 
     patterns.push_back({"fractal", [](Leds& leds, const PatternContext& ctx) {
         // Use localRnd so each scarf has a stable, unique grain that differs from its peers.
         uint8_t spatialScale = rndRange(ctx.localRnd, 4, 14);
-        fractal(leds, ctx.timeMs, ctx.palette, ctx.beat, spatialScale);
+        fractal(leds, ctx.timeMs, ctx.palette, ctx.beat, spatialScale, ctx.rnd);
     }});
 
     patterns.push_back({"cylon", [](Leds& leds, const PatternContext& ctx) {
@@ -60,7 +63,7 @@ PatternList getPatternList()
     patterns.push_back({"breathe", [](Leds& leds, const PatternContext& ctx) {
         int32_t periodMs = rndRange16(ctx.rnd, 20, 80) * 100;  // breath cycle: 2–8 s
         uint8_t hueSpeed = rndRange(ctx.rnd, 50, 200);         // larger = slower color drift
-        breathe(leds, ctx.timeMs, ctx.palette, ctx.beat, periodMs, hueSpeed);
+        breathe(leds, ctx.timeMs, ctx.palette, ctx.beat, periodMs, hueSpeed, ctx.rnd);
     }});
 
     patterns.push_back({"sparkle", [](Leds& leds, const PatternContext& ctx) {
@@ -73,6 +76,12 @@ PatternList getPatternList()
     patterns.push_back({"dance", [](Leds& leds, const PatternContext& ctx) {
         uint8_t hueSpeed = rndRange(ctx.rnd, 80, 220);        // color drift rate
         dance(leds, ctx.timeMs, ctx.palette, ctx.beat, hueSpeed);
+    }});
+
+    patterns.push_back({"generative", [](Leds& leds, const PatternContext& ctx) {
+        // ctx.rnd offsets the macro vibe signals → different 20-min trajectory each press.
+        // ctx.localRnd provides per-device spatial/phase offsets.
+        generative(leds, ctx.timeMs, ctx.palette, ctx.beat, ctx.rnd, ctx.localRnd);
     }});
 
     String line = String("Pattern list (") + patterns.size() + " patterns): ";

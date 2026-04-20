@@ -17,7 +17,7 @@ namespace Scarfnet {
 // Fully stateless: all output is a pure function of (timeMs, i). No static
 // variables, so there are no glitches when switching patterns.
 void fractal(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
-             const BeatInfo& beat, uint8_t spatialScale)
+             const BeatInfo& beat, uint8_t spatialScale, Rnd rnd)
 {
     const uint32_t t = (uint32_t)timeMs;
 
@@ -36,11 +36,17 @@ void fractal(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         leds[i] = ColorFromPalette(palette, hue, brightness, LINEARBLEND);
     }
 
-    // Beat: half-intensity white swell — subtle against the slow organic motion.
+    // Beat: colored flash whose intensity follows each LED's current luma —
+    // the beat lights up the noise peaks and leaves the valleys dim, reinforcing
+    // the fractal structure instead of washing it out with uniform white.
     if (beat.isActive()) {
-        uint8_t flash = beat.flashBrightness(80);
-        if (flash > 0)
-            for (auto& led : leds) led = blend(led, CRGB::White, flash >> 1);
+        uint8_t flash = beat.flashBrightness(100);
+        if (flash > 0) {
+            uint8_t flashHue = (uint8_t)(rnd * 17u >> 8);
+            CRGB flashColor = ColorFromPalette(palette, flashHue, 255, LINEARBLEND);
+            for (auto& led : leds)
+                led = blend(led, flashColor, scale8(flash, led.getLuma()));
+        }
     }
 }
 
