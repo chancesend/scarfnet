@@ -3,6 +3,11 @@
 #include <stdint.h>
 #include <cstddef>
 
+// ── Scarf firmware version ───────────────────────────────────────────────────
+// Single source of truth for the firmware version. Increment before each OTA
+// flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
+const uint16_t kScarfVersion              = 10;
+
 // ── ObservableButton ─────────────────────────────────────────────────────────
 const uint32_t kButtonPollIntervalMs       = 50;
 const uint32_t kLongPressMs               = 1000;
@@ -31,11 +36,6 @@ const int      kBurstSyncCount            = 3;
 // Set true  → long press toggles tap-tempo mode (short press feeds the beat).
 // Set false → long press restores original "same pattern, new randomizer" behaviour.
 const bool kTapTempoOnLongPress           = true;
-
-// ── Scarf firmware version ───────────────────────────────────────────────────
-// Single source of truth for the firmware version. Increment before each OTA
-// flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
-const uint16_t kScarfVersion              = 9;
 
 // HTTP Basic Auth username for OTA endpoints. Password is kMeshPassword (login.h).
 constexpr const char* kOtaHttpUser        = "scarfnet";
