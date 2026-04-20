@@ -61,7 +61,7 @@ void PatternManager::samePatternDifferentRandomizer(TimeMs lastSelfPressMs)
     changePatternFromString(newPattern->first, randomizer);
 }
 
-void PatternManager::changePatternFromString(const std::string &pattern, Rnd randomizer)
+bool PatternManager::changePatternFromString(const std::string &pattern, Rnd randomizer)
 {
     auto found = std::find_if(_patterns.begin(), _patterns.end(), [pattern](const NamedPattern &it) -> bool
                                 { return (pattern == it.first); });
@@ -72,10 +72,12 @@ void PatternManager::changePatternFromString(const std::string &pattern, Rnd ran
         _localRnd          = (Rnd)random16();  // fresh per-device seed; varies between scarves
         _targetPalette     = getColorPalette(randomizer);
         Scarfnet::log("Changing pattern: %s (randomizer %i localRnd %u)", found->first.c_str(), _currentRandomizer, _localRnd);
+        return true;
     }
     else
     {
-        Scarfnet::log("Pattern: %s not found!", found->first.c_str());
+        Scarfnet::log("Pattern: %s not found — ignoring update", pattern.c_str());
+        return false;
     }
 }
 

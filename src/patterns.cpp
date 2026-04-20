@@ -67,15 +67,28 @@ PatternList getPatternList()
     }});
 
     patterns.push_back({"sparkle", [](Leds& leds, const PatternContext& ctx) {
-        uint8_t sparkleRate = rndRange(ctx.rnd, 2, 30);       // baseline spark density
-        // On beat: saturate the strip with a white burst
-        if (ctx.beat.isOnBeat(80)) sparkleRate = 255;
+        uint8_t sparkleRate = rndRange(ctx.rnd, 1, 6);  // very sparse baseline
+
+        // Organic burst every ~2 min: slow noise (ctx.rnd shifts burst timing per fleet
+        // press so the burst cadence isn't always at the same point in the session).
+        // inoise8 clusters around 128; values above 195 are uncommon — roughly 1-2
+        // sustained bursts per 20-minute session, each lasting 20-60 seconds.
+        uint8_t burstNoise = inoise8((uint32_t)ctx.timeMs / 18000, (uint8_t)ctx.rnd);
+        if (burstNoise > 195) {
+            uint8_t excess = burstNoise - 195;      // 0–60 typical range
+            sparkleRate = qadd8(sparkleRate, min((int)excess * 3, 70));
+        }
+
+        // On beat: moderate pop, not a full whiteout
+        if (ctx.beat.isOnBeat(80)) sparkleRate = qadd8(sparkleRate, 60);
+
         sparkle(leds, ctx.timeMs, ctx.palette, sparkleRate);
     }});
 
     patterns.push_back({"dance", [](Leds& leds, const PatternContext& ctx) {
-        uint8_t hueSpeed = rndRange(ctx.rnd, 80, 220);        // color drift rate
-        dance(leds, ctx.timeMs, ctx.palette, ctx.beat, hueSpeed);
+        uint8_t hueSpeed    = rndRange(ctx.rnd, 80, 220);   // color drift rate
+        uint8_t macroPeriod = (ctx.rnd & 1) ? 64 : 32;     // wild window every 32 or 64 beats
+        dance(leds, ctx.timeMs, ctx.palette, ctx.beat, hueSpeed, macroPeriod);
     }});
 
     patterns.push_back({"generative", [](Leds& leds, const PatternContext& ctx) {

@@ -2,30 +2,34 @@
 
 namespace Scarfnet {
 
-// Dim palette-tinted base with rapid white sparks that decay quickly.
+// Dim palette-tinted base with occasional colored sparks and rare white flashes.
 //
-// This pattern carries state in the leds array between frames — the fast
-// fadeToBlack each tick creates the decay without static variables.
-// It converges to near-black within a few frames after a pattern switch, so
-// visual transition artifacts are minimal.
+// This pattern carries state in the leds array between frames — the slow
+// fadeToBlack each tick creates soft decay trails without static variables.
 //
 // `sparkleRate` — probability [0, 255] that any given LED pops each frame.
-//               Higher = denser. Derive from rnd in the lambda.
+//               Normally kept very low (~1-6); the lambda boosts it for bursts.
 void sparkle(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
              uint8_t sparkleRate)
 {
-    // Decay: pull each LED quickly toward black
-    fadeToBlackBy(leds.data(), kNumLeds, 80);
+    // Slow decay for delicate, lingering trails
+    fadeToBlackBy(leds.data(), kNumLeds, 30);
 
-    // Blend in a dim palette base so the strip isn't purely sparks on black
-    uint8_t hue = (uint8_t)((uint32_t)timeMs / 100);
-    CRGB baseColor = ColorFromPalette(palette, hue, 55, LINEARBLEND);
-    for (auto& led : leds) led = blend(led, baseColor, 25);
+    // Dim palette base — keeps the strip from going fully dark between sparks
+    uint8_t hue = (uint8_t)((uint32_t)timeMs / 150);
+    CRGB baseColor = ColorFromPalette(palette, hue, 35, LINEARBLEND);
+    for (auto& led : leds) led = blend(led, baseColor, 18);
 
-    // White sparks
+    // Mostly palette-colored sparks; ~1 in 6 are white for a natural twinkle mix
     for (int i = 0; i < kNumLeds; ++i) {
-        if (random8() < sparkleRate)
-            leds[i] = CRGB::White;
+        if (random8() < sparkleRate) {
+            if (random8() < 42) {
+                leds[i] = CRGB::White;
+            } else {
+                uint8_t sparkHue = hue + random8(48);  // slight hue spread around base
+                leds[i] = ColorFromPalette(palette, sparkHue, 220, LINEARBLEND);
+            }
+        }
     }
 }
 

@@ -30,7 +30,8 @@ public:
     // Keeps the current pattern but re-seeds the randomizer for a different look.
     void samePatternDifferentRandomizer(TimeMs lastSelfPressMs);
     // Switches to the named pattern with the given randomizer (used when syncing from a remote node).
-    void changePatternFromString(const std::string& pattern, Rnd randomizer);
+    // Returns true if the pattern was found and applied, false if the name was unrecognized.
+    bool changePatternFromString(const std::string& pattern, Rnd randomizer);
 
     // Steps the current palette one blend tick toward the target palette.
     void blendPalette();

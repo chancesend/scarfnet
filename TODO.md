@@ -25,8 +25,6 @@
 - [ ] Add a couple of modes that attempt to do "swarming" logic by taking into account time-of-arrival delays between scarves, so that the LED patterns are not all the same (they are either offset in time, or do slightly different patterns for interesting visual effects)
     - [ ] Add very slight delay of secondary nodes when playing received pattern?
     - [ ] Can we make all the scarves extensions of the same pattern?
-- [ ] More possible patterns!
-    * Patterns should be based more on common mesh time, so we see sync
 
 ## Party mode (tap-tempo) ideas
 - [x] For tap-tempo mode, we should take our tempo taps on the press of the button, not the release

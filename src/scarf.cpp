@@ -89,12 +89,13 @@ void Scarf::onReceived(const HeartbeatPacket& pkt)
     if (!shouldAcceptUpdate(pkt.changeIndex, _changeIndex))
         return;
 
-    _changeIndex            = rolloverGuard(pkt.changeIndex);
-    _lastSelfButtonPressMs  = rolloverGuard(pkt.lastPress);
-
     Scarfnet::log("[SCARF][RCV] accepting pattern=%s randomizer=%u ci=%u from node %u",
                   pkt.pattern, pkt.randomizer, pkt.changeIndex, pkt.id);
-    _patternManager->changePatternFromString(pkt.pattern, pkt.randomizer);
+    if (!_patternManager->changePatternFromString(pkt.pattern, pkt.randomizer))
+        return;  // unknown pattern — don't advance change index or last-press timestamp
+
+    _changeIndex            = rolloverGuard(pkt.changeIndex);
+    _lastSelfButtonPressMs  = rolloverGuard(pkt.lastPress);
 }
 
 void Scarf::setup()

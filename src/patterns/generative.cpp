@@ -52,16 +52,22 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
     const uint8_t vibeSplit  = inoise8(t / 3500, 200 + rndC);    // ~14 min full cycle
 
     // ── Layer 1: Organic noise base ───────────────────────────────────────────
-    // Two octaves of coherent noise. localPhase/localOffset shift the spatial
-    // origin, so each scarf samples a different region of the noise field.
-    // All scarves share the same temporal evolution (t / N divisors).
+    // Hue is driven by a shared coarse signal (no localOffset) so all scarves
+    // stay in the same color zone. Per-device offsets only affect fine texture
+    // and brightness, giving each scarf a different shimmer pattern within the
+    // shared palette neighborhood.
     for (int i = 0; i < kNumLeds; ++i) {
         const uint8_t x = (uint8_t)(i * 8 + localPhase);
 
-        const uint8_t fine   = inoise8(x + localOffset,       t / 40);   // fast shimmer (~10 s loop)
-        const uint8_t coarse = inoise8(x + localOffset + 100, t / 600);  // slow roll (~2.5 min)
+        // Shared hue anchor — no localOffset, identical across the fleet
+        const uint8_t sharedCoarse = inoise8(x, t / 600);
 
-        uint8_t hue = (coarse >> 1) + (fine >> 2) + (uint8_t)(t / 200) + rndHue + localHue;
+        // Per-device texture — shifts each scarf's brightness pattern independently
+        const uint8_t fine   = inoise8(x + localOffset,       t / 40);   // fast shimmer
+        const uint8_t coarse = inoise8(x + localOffset + 100, t / 600);  // brightness roll
+
+        // sharedCoarse dominates hue; fine adds only a small local shimmer-shift [0..15]
+        uint8_t hue = (sharedCoarse >> 1) + (fine >> 4) + (uint8_t)(t / 200) + rndHue + (localHue >> 1);
         // vibeEnergy is shared — all scarves brighten and dim together
         uint8_t bri = lerp8by8(40, vibeEnergy, qadd8(fine >> 1, coarse >> 2));
 
