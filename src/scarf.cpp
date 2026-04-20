@@ -103,7 +103,7 @@ void Scarf::setup()
     Scarfnet::log("Scarf::setup()");
 
     _builtinLED.resize(kNumBuiltinLeds);
-    FastLED.addLeds<M5_INTERNAL_TYPE, kBuiltinLedPin>(_builtinLED.data(), _builtinLED.size());
+    _builtinLedController = &FastLED.addLeds<M5_INTERNAL_TYPE, kBuiltinLedPin>(_builtinLED.data(), _builtinLED.size());
 
     _otaManager = make_unique<OtaManager>(kButtonPin, [this](CRGB color)
     {
@@ -230,6 +230,10 @@ void Scarf::loop()
         showLEDs();
         showBuiltInLED();
         FastLED.show();
+        // FastLED.show() applies global power scaling to all controllers, which
+        // dims the built-in LED along with the external strip. Re-show the built-in
+        // LED immediately at full brightness so it's excluded from current limiting.
+        _builtinLedController->showLeds(128);
     }
     EVERY_N_MILLISECONDS(kPaletteBlendRateMs)
     {
