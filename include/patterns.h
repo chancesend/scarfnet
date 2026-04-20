@@ -9,7 +9,16 @@
 namespace Scarfnet
 {
 
-typedef std::function<void(Leds&, int32_t, CRGBPalette16, Rnd, const BeatInfo&)> PatternFcn;
+// All context a pattern needs to render one frame.
+struct PatternContext {
+    TimeMs       timeMs;    // synchronized mesh time — use for all animation timing
+    CRGBPalette16 palette;   // current blended palette
+    Rnd           rnd;       // fleet-synchronized seed (last button press; same on all scarves)
+    Rnd           localRnd;  // per-device seed (node ID; unique per scarf, never transmitted)
+    BeatInfo      beat;      // tap-tempo beat state
+};
+
+typedef std::function<void(Leds&, const PatternContext&)> PatternFcn;
 typedef std::pair<std::string, PatternFcn> NamedPattern;
 typedef std::vector<NamedPattern> PatternList;
 
@@ -39,6 +48,10 @@ void confetti(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t 
 void firework(Leds& leds, int32_t timeMs, int periodMs, const CRGBPalette16& palette);
 void colorwaves(Leds& leds, int32_t timeMs, const CRGBPalette16& palette);
 void cylon(Leds& leds, int32_t timeMs, CRGB color, int width, int periodMs, fract8 blurAmount);
+void fractal(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, uint8_t spatialScale);
+void breathe(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, int32_t periodMs, uint8_t hueSpeed);
+void sparkle(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t sparkleRate);
+void dance(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, uint8_t hueSpeed);
 void fillNoise(Leds& leds, int32_t timeMs);
 
 // ── Pattern registry ─────────────────────────────────────────────────────────

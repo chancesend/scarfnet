@@ -29,8 +29,8 @@
     * Patterns should be based more on common mesh time, so we see sync
 
 ## Party mode (tap-tempo) ideas
-- [ ] For tap-tempo mode, we should take our tempo taps on the press of the button, not the release
-- [ ] All modes should have some sort of party mode variant
+- [x] For tap-tempo mode, we should take our tempo taps on the press of the button, not the release
+- [x] All modes should have some sort of party mode variant
 
 
 ## Log Visualizations
