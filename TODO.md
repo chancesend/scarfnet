@@ -20,17 +20,12 @@
 
 - [ ] Debug mode, to add a visual notification when scarf enters/leaves network, or other network event happens?
 - [ ] What sort of security can we put in place to make sure that scarves only listen to other scarves? (networkID/password?)
-- [ ] What else should go into heartbeat packet? Possibly 
-    - scarf version (uint16)
-- [ ] HeartbeatPacket needs to be aligned better - make sure pattern name is 4-byte aligned
-- [ ] Heartbeat transmit timing should have some slop/walk, to prevent continual network conflict
-- [ ] Randomizer should be more than u8. Maybe u16?
 
 ## Pattern enhancements
 - [ ] Add a couple of modes that attempt to do "swarming" logic by taking into account time-of-arrival delays between scarves, so that the LED patterns are not all the same (they are either offset in time, or do slightly different patterns for interesting visual effects)
     - [ ] Add very slight delay of secondary nodes when playing received pattern?
     - [ ] Can we make all the scarves extensions of the same pattern?
-- [ ] Move individual patterns into separate files for modularity
+- [x] Move individual patterns into separate files for modularity
 - [ ] More patterns! At least 8
     * Patterns should be based more on common mesh time, so we see sync
 - [ ] Make sure that when pattern and time updates are received from other scarves, the local scarf's pattern is blended over the course of a second or two, rather than have a hard swap
