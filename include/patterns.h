@@ -14,10 +14,16 @@ typedef std::vector<NamedPattern> PatternList;
 
 // ── Shared pattern utilities ─────────────────────────────────────────────────
 
-// Maps `val` into [low, high) using modulo. Use with `randomizer % N` to vary
-// parameters between scarves without large jumps.
-inline uint8_t interpUint8(uint8_t val, uint8_t low, uint8_t high) {
-    return val % (high - low) + low;
+// Maps a Rnd seed deterministically into [low, high). Use in getPatternList
+// lambdas to convert the seed into concrete parameter values for a pattern.
+inline uint8_t rndRange(Rnd rnd, uint8_t low, uint8_t high) {
+    return rnd % (high - low) + low;
+}
+
+// Maps a Rnd seed deterministically into [low, high). Use in getPatternList
+// lambdas to convert the seed into concrete parameter values for a pattern.
+inline uint16_t rndRange16(Rnd rnd, uint16_t low, uint16_t high) {
+    return rnd % (high - low) + low;
 }
 
 // Returns the elapsed fraction of `period` at time `time` as a fract8 [0, 255].
