@@ -81,6 +81,9 @@ private:
 
     Leds _ledsReal;
     Leds _builtinLED;
+    // Pointer to the built-in LED's FastLED controller so we can re-show it at
+    // full brightness after FastLED.show() applies global power scaling.
+    CLEDController* _builtinLedController {nullptr};
 
     Scheduler _userScheduler;
 

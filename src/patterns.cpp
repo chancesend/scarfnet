@@ -56,7 +56,7 @@ PatternList getPatternList()
         CRGB   color         = ColorFromPalette(ctx.palette, (ctx.timeMs >> paletteShift) % 255);
         // When a tempo is active, lock the sweep period to the beat so the bar
         // bounces end-to-end in sync with the music.
-        if (ctx.beat.isActive()) periodMs = ctx.beat.intervalMs;
+        if (ctx.beat.isActive()) periodMs = ctx.beat.intervalMs * 2;
         cylon(leds, ctx.timeMs, color, width, periodMs, blurAmount);
     }});
 
