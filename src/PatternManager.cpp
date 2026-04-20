@@ -21,13 +21,14 @@ std::string PatternManager::getCurrentPattern()
     return _currentPattern->first;
 }
 
-void PatternManager::runCurrentPattern(Leds& leds, TimeMs nodeTimeMs)
+void PatternManager::runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const BeatInfo& beat)
 {
     _currentPattern->second(
         leds,
         nodeTimeMs,
         _currentPalette,
-        _currentRandomizer);
+        _currentRandomizer,
+        beat);
 }
 
 void PatternManager::initPatterns()

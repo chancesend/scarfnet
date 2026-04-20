@@ -7,6 +7,7 @@
 #include "OtaManager.h"
 #include "patterns.h"
 #include "PatternManager.h"
+#include "tap_tempo.h"
 
 #include <TaskScheduler.h>
 #include <Arduino.h>
@@ -63,6 +64,9 @@ private:
     ObservableButton _nextPatternButton;
     Mesh::TimeMs     _lastSelfButtonPressMs {0};
     bool             _onFlag        {false};
+
+    TapTempo _tapTempo;
+    bool     _tapTempoMode {false};  // true = long-press entered tap-tempo input mode
 
     Preferences _preferences;
 
