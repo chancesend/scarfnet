@@ -47,6 +47,12 @@ void ObservableButton::checkButtonEvent()
 {
     const ButtonReading reading = _pollFn();
 
+    // Fire eDown on the press edge so callers that need the down timestamp
+    // (e.g. tap-tempo) don't have to wait for the release.
+    if (reading.wasJustPressed) {
+        onEvent(Event::eDown);
+    }
+
     const auto smEvent = _sm.update(reading);
 
     switch (smEvent) {
