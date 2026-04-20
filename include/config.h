@@ -35,7 +35,7 @@ const bool kTapTempoOnLongPress           = true;
 // ── Scarf firmware version ───────────────────────────────────────────────────
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
-const uint16_t kScarfVersion              = 8;
+const uint16_t kScarfVersion              = 9;
 
 // HTTP Basic Auth username for OTA endpoints. Password is kMeshPassword (login.h).
 constexpr const char* kOtaHttpUser        = "scarfnet";

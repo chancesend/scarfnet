@@ -43,6 +43,7 @@ private:
     CRGBPalette16 _currentPalette {CRGB::Black};
     CRGBPalette16 _targetPalette {RainbowColors_p};
     Rnd _currentRandomizer {0};
+    Rnd _localRnd          {0};  // re-randomized locally on each pattern/seed change
 
 
 };
