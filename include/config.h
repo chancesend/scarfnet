@@ -14,6 +14,9 @@ const int kPaletteBlendRateMs             = 40;
 
 // ── Scarf: heartbeat & blink ─────────────────────────────────────────────────
 const uint32_t kHeartbeatIntervalMs       = 5000;
+// Random ±jitter applied to each heartbeat interval so nodes on identical
+// schedules naturally drift apart and stop colliding.
+const uint32_t kHeartbeatJitterMs         = 200;
 const uint32_t kMemLogIntervalMs          = 60000;
 const int kNodeBlinkPeriodMs              = 3000;
 const uint32_t kSyncBlinkPeriodMs         = 5000;
@@ -23,6 +26,14 @@ const uint32_t kSyncBlinkPeriodMs         = 5000;
 // kBurstSyncIntervalMs so the joining node converges pattern and clock quickly.
 const uint32_t kBurstSyncIntervalMs       = 500;
 const int      kBurstSyncCount            = 3;
+
+// ── Scarf firmware version ───────────────────────────────────────────────────
+// Single source of truth for the firmware version. Increment before each OTA
+// flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
+const uint16_t kScarfVersion              = 7;
+
+// HTTP Basic Auth username for OTA endpoints. Password is kMeshPassword (login.h).
+constexpr const char* kOtaHttpUser        = "scarfnet";
 
 // ── ESP-NOW ───────────────────────────────────────────────────────────────────
 // All scarves must use the same channel. Channel 6 avoids overlap with channels

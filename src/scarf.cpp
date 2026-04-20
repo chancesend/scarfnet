@@ -32,11 +32,12 @@ Scarf::Scarf() :
 void Scarf::sendMessage()
 {
     HeartbeatPacket pkt = {};
-    pkt.id           = _mesh->nodeId();
-    pkt.lastPress    = _lastSelfButtonPressMs;
+    pkt.id            = _mesh->nodeId();
+    pkt.lastPress     = _lastSelfButtonPressMs;
     pkt.currentTimeMs = _mesh->timeMs();
-    pkt.changeIndex  = _changeIndex;
-    pkt.randomizer   = (uint8_t)_lastSelfButtonPressMs;
+    pkt.changeIndex   = _changeIndex;
+    pkt.randomizer    = (uint16_t)_lastSelfButtonPressMs;
+    pkt.version       = kScarfVersion;
 
     const auto& patternName = _patternManager->getCurrentPattern();
     size_t copyLen = patternName.size() < sizeof(pkt.pattern) - 1
@@ -46,6 +47,10 @@ void Scarf::sendMessage()
     pkt.pattern[copyLen] = '\0';
 
     _mesh->broadcast(pkt);
+
+    // Jitter the next interval so nodes on identical boot schedules drift apart.
+    int32_t jitter = (int32_t)random(kHeartbeatJitterMs * 2 + 1) - (int32_t)kHeartbeatJitterMs;
+    _taskSendMessage.setInterval(kHeartbeatIntervalMs + jitter);
     Scarfnet::log("[SND] id=%u pattern=%s ci=%u time=%u",
                   pkt.id, pkt.pattern, pkt.changeIndex, pkt.currentTimeMs);
 }
@@ -156,7 +161,7 @@ void Scarf::processEvent(const ObservableButton::Event& event)
             _taskSendMessage.forceNextIteration();
             Scarfnet::log("ePress → pattern=%s randomizer=%u ci=%u",
                 _patternManager->getCurrentPattern().c_str(),
-                (uint8_t)_lastSelfButtonPressMs, _changeIndex);
+                (uint16_t)_lastSelfButtonPressMs, _changeIndex);
             break;
         }
         case ObservableButton::Event::eLongPress:
@@ -167,7 +172,7 @@ void Scarf::processEvent(const ObservableButton::Event& event)
             _taskSendMessage.forceNextIteration();
             Scarfnet::log("eLongPress → pattern=%s randomizer=%u ci=%u",
                 _patternManager->getCurrentPattern().c_str(),
-                (uint8_t)_lastSelfButtonPressMs, _changeIndex);
+                (uint16_t)_lastSelfButtonPressMs, _changeIndex);
             break;
         }
         case ObservableButton::Event::eExtraLongPress:

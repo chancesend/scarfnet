@@ -10,16 +10,23 @@
 namespace Scarfnet {
 
 // Packed heartbeat broadcast over ESP-NOW. Well under the 250-byte limit.
-// Total: 54 bytes.
+// Total: 65 bytes. `pattern` starts at offset 32 (4-byte aligned).
 //
-//  byte  0       4       8      12      16      20    21                   54                  250
-//        +-------+-------+-------+-------+-------+-----+--------------------+--------------------+
-//        |  id   |netId  | press |timeMs |change | rnd |     pattern        |      reserved      |
-//        | (u32) | (u32) | (u32) | (u32) | (u32) |(u8) |    char[33]        |      196 B         |
-//        +-------+-------+-------+-------+-------+-----+--------------------+--------------------+
-//          4 B     4 B     4 B     4 B     4 B    1 B        33 B
+//  byte  0       4       8      12      16      20  22  24              32
+//        +-------+-------+-------+-------+-------+---+---+---------------+
+//        |  id   |netId  | press |timeMs |change |rnd|ver|   reserved    |
+//        | (u32) | (u32) | (u32) | (u32) | (u32) |u16|u16|   u8[8]       |
+//        +-------+-------+-------+-------+-------+---+---+---------------+
+//          4 B     4 B     4 B     4 B     4 B    2 B 2 B     8 B
 //
-// `randomizer` is uint8_t (low byte of lastPress) — equivalent to Rnd from
+//  byte  32                  65                  250
+//        +--------------------+--------------------+
+//        |     pattern        |      reserved      |
+//        |    char[33]        |      185 B         |
+//        +--------------------+--------------------+
+//              33 B
+//
+// `randomizer` is uint16_t (low 2 bytes of lastPress) — equivalent to Rnd from
 // typedefs.h, but typedefs.h pulls in FastLED which is hardware-only.
 struct __attribute__((packed)) HeartbeatPacket {
     NodeId      id;             // sender node ID (last 4 MAC bytes cast to uint32)
@@ -27,8 +34,10 @@ struct __attribute__((packed)) HeartbeatPacket {
     TimeMs      lastPress;      // synchronized time of last button press on sender
     TimeMs      currentTimeMs;  // sender's synchronized clock (millis() + EMA offset)
     ChangeIndex changeIndex;    // monotonic pattern-change counter
-    uint8_t     randomizer;     // pattern seed (low byte of lastPress)
-    char        pattern[33];    // null-terminated pattern name, max 32 chars
+    uint16_t    randomizer;     // pattern seed (low 2 bytes of lastPress)
+    uint16_t    version;        // firmware version (kScarfVersion from config.h)
+    uint8_t     _reserved[8];   // reserved for future fields; zero on send, ignored on receive
+    char        pattern[33];    // null-terminated pattern name, max 32 chars; 4-byte aligned at offset 32
 };
 static_assert(sizeof(HeartbeatPacket) <= 250, "HeartbeatPacket exceeds ESP-NOW 250-byte limit");
 
