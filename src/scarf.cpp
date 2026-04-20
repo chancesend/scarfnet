@@ -164,21 +164,27 @@ void Scarf::processEvent(const ObservableButton::Event& event)
 {
     switch (event)
     {
-        case ObservableButton::Event::ePress:
+        case ObservableButton::Event::eDown:
         {
             if (_tapTempoMode) {
                 _tapTempo.tap(_mesh->timeMs());
-                Scarfnet::log("ePress (tap-tempo) interval=%ums active=%d",
+                Scarfnet::log("eDown (tap-tempo) interval=%ums active=%d",
                     _tapTempo.beatIntervalMs(), (int)_tapTempo.isActive());
-            } else {
+                _taskSendMessage.forceNextIteration();
+            }
+            break;
+        }
+        case ObservableButton::Event::ePress:
+        {
+            if (!_tapTempoMode) {
                 _lastSelfButtonPressMs = _mesh->timeMs();
                 _patternManager->incrementPattern(_lastSelfButtonPressMs);
                 _changeIndex += 1;
                 Scarfnet::log("ePress → pattern=%s randomizer=%u ci=%u",
                     _patternManager->getCurrentPattern().c_str(),
                     (uint16_t)_lastSelfButtonPressMs, _changeIndex);
+                _taskSendMessage.forceNextIteration();
             }
-            _taskSendMessage.forceNextIteration();
             break;
         }
         case ObservableButton::Event::eLongPress:

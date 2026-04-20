@@ -19,19 +19,18 @@
 ## Future Work
 
 - [ ] Debug mode, to add a visual notification when scarf enters/leaves network, or other network event happens?
-- [ ] What sort of security can we put in place to make sure that scarves only listen to other scarves? (networkID/password?)
+- [ ] What sort of security can we put in place to make sure that scarves only listen to other scarves? (networkID/password?, or a checksum of some sort?)
 
 ## Pattern enhancements
 - [ ] Add a couple of modes that attempt to do "swarming" logic by taking into account time-of-arrival delays between scarves, so that the LED patterns are not all the same (they are either offset in time, or do slightly different patterns for interesting visual effects)
     - [ ] Add very slight delay of secondary nodes when playing received pattern?
     - [ ] Can we make all the scarves extensions of the same pattern?
-- [ ] Move individual patterns into separate files for modularity
-- [ ] More patterns! At least 8
+- [ ] More possible patterns!
     * Patterns should be based more on common mesh time, so we see sync
-- [ ] Make sure that when pattern and time updates are received from other scarves, the local scarf's pattern is blended over the course of a second or two, rather than have a hard swap
 
 ## Party mode (tap-tempo) ideas
 - [ ] For tap-tempo mode, we should take our tempo taps on the press of the button, not the release
+- [ ] All modes should have some sort of party mode variant
 
 
 ## Log Visualizations

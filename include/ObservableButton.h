@@ -33,7 +33,8 @@ class ObservableButton
 {
 public:
     enum Event {
-        ePress = 0,
+        eDown = 0,      // fires on the press edge (button physically goes down)
+        ePress,         // fires on the release edge after a short press
         eLongPress,
         eDoublePress,
         eRelease,
