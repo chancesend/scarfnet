@@ -112,6 +112,39 @@ The type is toggled via extra-long press and survives reboots.
 | `include/defines.h` | Pin assignments, LED count, LED type enums, `SCARFNET_EMBEDDED` compile guard. |
 | `include/typedefs.h` | Core type aliases: `Leds` (`std::vector<CRGB>`) and `Rnd` (`uint16_t`). |
 
+## Pattern Simulator
+
+A native terminal simulator lets you preview all patterns on N simulated scarves without hardware. It uses ANSI truecolor escape codes to render LED colors directly in the terminal — no dependencies beyond the system compiler.
+
+```bash
+cd tools/sim
+make        # build
+make run    # build and run
+```
+
+The simulator renders up to 8 scarves as rows of colored blocks, animating at ~30 fps:
+
+```
+Scarfnet Simulator  pattern: dance        ● 120 BPM  seed: 0x1A2B  scarves: 4
+--------------------------------------------------------------
+S1 ██████████████████████████████████████████████████
+S2 ██████████████████████████████████████████████████
+S3 ██████████████████████████████████████████████████
+S4 ██████████████████████████████████████████████████
+--------------------------------------------------------------
+[SPC] next  [R] seed  [T] tap tempo  [+/-] scarves  [Q] quit
+```
+
+| Key | Action |
+|---|---|
+| `SPACE` | Advance to the next pattern |
+| `R` | New global seed — same pattern, different look |
+| `T` | Tap tempo (two taps sets BPM; further taps refine) |
+| `+` / `-` | Add or remove simulated scarves (1–8) |
+| `Q` / `ESC` | Quit |
+
+The sim compiles the real pattern engine (`src/patterns/`, `PatternManager`, `palettes`) natively. Hardware-only code (`Mesh`, `Arduino.h`, FastLED gradient palettes) is gated behind `#if SCARFNET_EMBEDDED`. The fastled_stub (`include/fastled_stub.h`) provides CRGB, palette math, noise, and trig for native builds.
+
 ## Python Tooling
 
 Scripts live in `tools/`. Use `uv` — never bare `python3`.

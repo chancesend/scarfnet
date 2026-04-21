@@ -6,7 +6,7 @@
 // ── Scarf firmware version ───────────────────────────────────────────────────
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
-const uint16_t kScarfVersion              = 10;
+const uint16_t kScarfVersion              = 11;
 
 // ── ObservableButton ─────────────────────────────────────────────────────────
 const uint32_t kButtonPollIntervalMs       = 50;
