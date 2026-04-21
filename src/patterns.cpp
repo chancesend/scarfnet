@@ -17,9 +17,9 @@ PatternList getPatternList()
 
     patterns.push_back({"confetti", [](Leds& leds, const PatternContext& ctx) {
         uint8_t fadeSpeed = rndRange(ctx.rnd,  1,  25);  // lower = slower fade
-        uint8_t popChance = rndRange(ctx.rnd,  0, 100);  // % chance a pixel pops per tick
+        uint16_t popChance = rndRange(ctx.rnd,  0, 100);  // % chance a pixel pops per tick
         // On beat: saturate pop chance for a dense burst, then let it decay normally.
-        if (ctx.beat.isOnBeat(80)) popChance = 100;
+        if (ctx.beat.isOnBeat(80)) popChance = 500;
         confetti(leds, ctx.timeMs, ctx.palette, fadeSpeed, popChance);
     }});
 
@@ -31,11 +31,12 @@ PatternList getPatternList()
     }});
 
     patterns.push_back({"colorwaves", [](Leds& leds, const PatternContext& ctx) {
-        colorwaves(leds, ctx.timeMs, ctx.palette);
+        colorwaves(leds, ctx.timeMs, ctx.palette, ctx.beat);
         // Palette-colored swell on the beat — hue from rnd so each fleet session
         // gets a distinct accent color rather than always washing to white.
         if (ctx.beat.isActive()) {
-            uint8_t flash = ctx.beat.flashBrightness(80);
+            int flashBrightness = rndRange(ctx.localRnd xor ctx.timeMs, 0, 255);  // launch cycle length
+            uint8_t flash = ctx.beat.flashBrightness(flashBrightness);
             if (flash > 0) {
                 CRGB flashColor = ColorFromPalette(ctx.palette, (uint8_t)(ctx.rnd * 17u >> 8), 255, LINEARBLEND);
                 for (auto& led : leds) led = blend(led, flashColor, flash >> 2);
@@ -96,6 +97,10 @@ PatternList getPatternList()
         // ctx.rnd offsets the macro vibe signals → different 20-min trajectory each press.
         // ctx.localRnd provides per-device spatial/phase offsets.
         generative(leds, ctx.timeMs, ctx.palette, ctx.beat, ctx.rnd, ctx.localRnd);
+    }});
+
+    patterns.push_back({"digital", [](Leds& leds, const PatternContext& ctx) {
+        digital(leds, ctx.timeMs, ctx.palette, ctx);
     }});
 
     std::string line = "Pattern list (" + std::to_string(patterns.size()) + " patterns): ";

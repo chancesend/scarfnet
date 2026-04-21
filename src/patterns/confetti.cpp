@@ -2,7 +2,7 @@
 
 namespace Scarfnet {
 
-void confetti(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t fade, uint8_t popChancePct)
+void confetti(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t fade, uint16_t popChancePct)
 {
     static int thishue = 150;
 
@@ -12,12 +12,17 @@ void confetti(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t 
     constexpr int     huediff  = 100;
 
     fadeToBlackBy(leds.data(), kNumLeds, fade);
-    int pos = random16(kNumLeds);
-    bool doPop = random16(100) > (100 - popChancePct);
-    if (doPop) {
-        leds[pos] = ColorFromPalette(palette, thishue + random16(huediff) / 4,
-                                     thisbri, LINEARBLEND_NOWRAP);
-    }
+    int popChance = (int)popChancePct;
+    do {
+        int pos = random16(kNumLeds);
+        int popChancePct = std::min(popChance, 100);
+        bool doPop = random16(100) > (100 - popChancePct);
+        if (doPop) {
+            leds[pos] = ColorFromPalette(palette, thishue + random16(huediff) / 4,
+                                        thisbri, LINEARBLEND_NOWRAP);
+        }
+        popChance -= 100;
+    } while (popChance > 0);
     thishue += thisinc;
 }
 
