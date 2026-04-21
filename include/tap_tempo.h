@@ -24,15 +24,33 @@ namespace Scarfnet {
 struct BeatInfo {
     uint16_t intervalMs = 0;  // beat period; 0 = no active tempo
     uint16_t phaseMs    = 0;  // ms elapsed since the last beat
+    uint16_t beatNumber = 0;
+    uint16_t barNumber  = 0;  // number of bars since tap tempo was established (optional, for patterns that want it)
 
     BeatInfo() = default;
-    BeatInfo(uint16_t intervalMs, uint16_t phaseMs) : intervalMs(intervalMs), phaseMs(phaseMs) {}
+    BeatInfo(uint16_t intervalMs, uint16_t phaseMs, uint16_t beatNumber) : intervalMs(intervalMs), phaseMs(phaseMs), beatNumber(beatNumber) {}
 
     bool isActive() const { return intervalMs > 0; }
 
     // True within `windowMs` of the beat onset.
     bool isOnBeat(uint16_t windowMs = 60) const {
         return isActive() && phaseMs < windowMs;
+    }
+
+    // TODO: Fix this method
+    bool isOnBar(uint16_t windowMs = 60) const {
+        return isActive() && phaseMs < windowMs;
+    }
+
+    // TODO: Fix this method
+    int getBeatNumber() const {
+        return isActive() ? beatNumber : 0;
+    }
+
+    // TODO: Fix this method
+    int getBarNumber() const {
+        int8_t kBeatsPerBar = 4;
+        return isActive() ? beatNumber / kBeatsPerBar : 0;
     }
 
     // Brightness for a flash that peaks at 255 on the beat and fades to 0 at `windowMs`.
@@ -100,9 +118,15 @@ struct TapTempo {
         return (uint16_t)(elapsed % _intervalMs);
     }
 
+    uint16_t beatNumber(TimeMs now) const {
+        if (!_active || _intervalMs == 0) return 0;
+        uint32_t elapsed = (now >= _lastBeatMs) ? (now - _lastBeatMs) : 0;
+        return (uint16_t)(elapsed / _intervalMs);
+    }
+
     // Snapshot of beat state at `now`, ready to pass to a pattern render function.
     BeatInfo beatInfo(TimeMs now) const {
-        return BeatInfo{ beatIntervalMs(), beatPhaseMs(now) };
+        return BeatInfo{ beatIntervalMs(), beatPhaseMs(now), beatNumber(now) };
     }
 
 private:

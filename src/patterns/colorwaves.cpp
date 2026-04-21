@@ -2,7 +2,7 @@
 
 namespace Scarfnet {
 
-void colorwaves(Leds& leds, int32_t timeMs, const CRGBPalette16& palette)
+void colorwaves(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat)
 {
     static uint16_t sPseudotime = 0;
     static uint16_t sLastMillis = 0;
@@ -18,6 +18,20 @@ void colorwaves(Leds& leds, int32_t timeMs, const CRGBPalette16& palette)
 
     uint16_t ms = timeMs;
     uint16_t deltams = ms - sLastMillis;
+
+    // Every 16 bars, speed up to 5× for one bar to create a sense of phrasing.
+    // This is a bit of a hack, but it builds tension into the phrase boundary without
+    // touching anything visual directly (e.g. by changing the palette or doing a flash).
+    uint8_t speedMult = 1;
+    if (beat.isActive() && beat.intervalMs > 0) {
+        uint32_t beatCount = (uint32_t)((uint32_t)timeMs / beat.intervalMs);
+        const int32_t phraseLength = 16;
+        if ((beatCount % phraseLength) >= phraseLength - 1) {
+            speedMult = 5;
+        }
+    }
+    deltams *= speedMult;
+
     sLastMillis = ms;
     sPseudotime += deltams * msmultiplier;
     sHue16 += deltams * beatsin88(400, 5, 9);

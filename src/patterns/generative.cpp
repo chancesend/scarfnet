@@ -69,33 +69,54 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         // sharedCoarse dominates hue; fine adds only a small local shimmer-shift [0..15]
         uint8_t hue = (sharedCoarse >> 1) + (fine >> 4) + (uint8_t)(t / 200) + rndHue + (localHue >> 1);
         // vibeEnergy is shared — all scarves brighten and dim together
-        uint8_t bri = lerp8by8(40, vibeEnergy, qadd8(fine >> 1, coarse >> 2));
+        uint8_t bri = lerp8by8(100, qadd8(vibeEnergy, 80), qadd8(fine >> 1, coarse >> 2));
 
         leds[i] = ColorFromPalette(palette, hue, bri, LINEARBLEND);
     }
 
     // ── Layer 2: Moving energy streak ─────────────────────────────────────────
     // vibeFlow morphs its character:
-    //   low  vibeFlow → wide (8 LEDs), slow (6 s sweep) — organic
-    //   high vibeFlow → narrow (2 LEDs), fast (600 ms dart) — digital
+    //   low  vibeFlow → wide (8 LEDs), slow (16 s sweep) — organic
+    //   high vibeFlow → narrow (2 LEDs), slow-ish (1.5 s dart) — digital
     // localPhase staggers the streak position across scarves so they're not
     // all at the same point simultaneously.
+    //
+    // Phrase-end burst: on the last beat of every 16-beat phrase the streak
+    // overrides to a fast dart (300 ms) at full brightness with a slight white wash.
     {
         const uint8_t streakWidth = lerp8by8(8, 2, vibeFlow);
-        const uint32_t period     = (uint32_t)lerp8by8(60, 6, vibeFlow) * 100;  // 6000–600 ms
+        const uint32_t period     = (uint32_t)lerp8by8(160, 15, vibeFlow) * 100;  // 16000–1500 ms
+
+        // Detect last beat of every 16-beat phrase for the burst
+        uint8_t phraseBurst = 0;
+        if (beat.isActive() && beat.intervalMs > 0) {
+            uint32_t beatCount = (uint32_t)(t / beat.intervalMs);
+            if ((beatCount % 16) == 15) {
+                // Fades from 255 → 0 over the course of that last beat
+                phraseBurst = beat.flashBrightness(beat.intervalMs);
+            }
+        }
+
+        const uint32_t activePeriod = (phraseBurst > 0) ? 300u : period;
 
         // Apply per-device phase offset to streak position
-        uint32_t tOff = (t + (uint32_t)localPhase * (period >> 8)) % period;
-        uint8_t  frac = (uint8_t)(tOff * 255 / period);
+        uint32_t tOff = (t + (uint32_t)localPhase * (activePeriod >> 8)) % activePeriod;
+        uint8_t  frac = (uint8_t)(tOff * 255 / activePeriod);
         uint8_t  pos  = (uint8_t)((uint16_t)quadwave8(frac) * kNumLeds >> 8);
 
         uint8_t streakHue = (uint8_t)(t / 120 + rndHue + localHue);
-        CRGB streakColor = ColorFromPalette(palette, streakHue, 240, LINEARBLEND);
+        uint8_t streakBri = (phraseBurst > 0) ? 255 : 150;
+        CRGB streakColor = ColorFromPalette(palette, streakHue, streakBri, LINEARBLEND);
+        if (phraseBurst > 0) {
+            streakColor = blend(streakColor, CRGB::White, phraseBurst >> 2);  // subtle whitening at burst peak
+        }
 
         for (int i = 0; i < kNumLeds; ++i) {
             uint8_t dist = (uint8_t)abs(i - (int)pos);
             if (dist < streakWidth) {
-                uint8_t blend_amt = lerp8by8(220, 60, dist * 255 / streakWidth);
+                uint8_t blend_amt = (phraseBurst > 0)
+                    ? lerp8by8(200, 80, dist * 255 / streakWidth)
+                    : lerp8by8(130, 40, dist * 255 / streakWidth);
                 leds[i] = blend(leds[i], streakColor, blend_amt);
             }
         }
@@ -110,8 +131,9 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
     //   half-beat  (÷2) — snaps on every half-beat, tight rhythmic chop
     //   quarter-beat (÷4) — used when vibeFlow is high (fast/digital character)
     // When no beat, an autonomous period (380–560 ms from localRnd) is used.
-    if (vibeSplit > 140) {
-        const uint8_t fragAmt = qsub8((vibeSplit - 140) * 2, 0);  // 0→230 as vibeSplit→255
+    if (vibeSplit > 110) {
+        const uint8_t excess  = vibeSplit - 110;                              // 0–145
+        const uint8_t fragAmt = (excess > 127) ? 255 : (uint8_t)(excess * 2); // 0→255 as vibeSplit→237
 
         uint16_t snapPeriod;
         if (beat.isActive() && beat.intervalMs > 0) {

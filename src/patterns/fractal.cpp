@@ -19,18 +19,28 @@ namespace Scarfnet {
 void fractal(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
              const BeatInfo& beat, uint8_t spatialScale, Rnd rnd)
 {
-    const uint32_t t = (uint32_t)timeMs;
+    // Every phrase, speed up the noise traversal to create a sense of phrasing. 
+    uint8_t speedMult = 1;
+    if (beat.isActive() && beat.intervalMs > 0) {
+        uint32_t beatCount = (uint32_t)((uint32_t)timeMs / beat.intervalMs);
+        const int32_t phraseLength = 4;
+        if ((beatCount % phraseLength) >= phraseLength - 1) {
+            speedMult = 3;
+        }
+    }
+
+    const uint32_t t = (uint32_t)timeMs * speedMult;
 
     for (int i = 0; i < kNumLeds; ++i) {
         const uint8_t x = (uint8_t)(i * spatialScale);
 
-        const uint8_t fine   = inoise8(x,       t /    8);  // ~2s
-        const uint8_t mid    = inoise8(x + 100, t /  150);  // ~40s
-        const uint8_t coarse = inoise8(x + 200, t / 4800);  // ~20min
+        const uint8_t fine   = inoise8(x,       t /    4);
+        const uint8_t mid    = inoise8(x + 100, t /  50);
+        const uint8_t coarse = inoise8(x + 200, t / 1000);
 
         // fBm blend: coarser octave drives most of the hue so the slow drift
         // is clearly visible; finer octaves contribute detail and shimmer.
-        uint8_t hue        = (coarse >> 1) + (mid >> 2) + (fine >> 2);
+        uint8_t hue        = (coarse >> 2) + (mid >> 1) + (fine >> 1);
         uint8_t brightness = lerp8by8(160, 255, qadd8(fine >> 1, mid >> 2));
 
         leds[i] = ColorFromPalette(palette, hue, brightness, LINEARBLEND);
