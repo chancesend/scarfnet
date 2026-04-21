@@ -1,7 +1,8 @@
 #include "patterns.h"
 #include "log.h"
 
-#include <Arduino.h>
+#include <cstdio>
+#include <string>
 
 namespace Scarfnet {
 
@@ -97,9 +98,9 @@ PatternList getPatternList()
         generative(leds, ctx.timeMs, ctx.palette, ctx.beat, ctx.rnd, ctx.localRnd);
     }});
 
-    String line = String("Pattern list (") + patterns.size() + " patterns): ";
+    std::string line = "Pattern list (" + std::to_string(patterns.size()) + " patterns): ";
     for (auto& pattern : patterns)
-        line += pattern.first.c_str() + String(", ");
+        line += pattern.first + ", ";
     Scarfnet::log(line.c_str());
 
     return patterns;

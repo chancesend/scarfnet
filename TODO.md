@@ -52,3 +52,5 @@
 - [ ] Investigate whether the "clock settling" gate is actually helping, or if it is causing more problems when there are unstable networks
 - [ ] Investigate running on Zigbee (would require an upgraded ESP32)
 - [ ] What refactorings would make this more extensible and modular?
+- [ ] Figure out if there's a better way to form the network ad-hoc via button presses
+- [x] Is there a way we can visualize the patterns natively? Figure out a way to simulate N scarves, so that we can simulate how different patterns will look in the real scarves
