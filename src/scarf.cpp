@@ -252,12 +252,17 @@ void Scarf::showBuiltInLED()
     {
         _builtinLED[i] = CRGB::Black;
 
-        if (_tapTempoMode && _tapTempo.isActive()) {
-            // Green pulse at the beat rate — confirms the tempo is locked in.
-            uint16_t phase    = _tapTempo.beatPhaseMs(_timeMsec);
-            uint16_t interval = _tapTempo.beatIntervalMs();
-            if (interval > 0 && phase < interval / 10)  // ~10% duty cycle
-                _builtinLED[i] = CRGB::Green;
+        if (_tapTempoMode) {
+            // Dim green idle glow indicates tap-tempo mode is active.
+            _builtinLED[i] = CRGB(0, 5, 0);
+
+            if (_tapTempo.isActive()) {
+                // Bright green pulse at the beat rate — confirms tempo is locked.
+                uint16_t phase    = _tapTempo.beatPhaseMs(_timeMsec);
+                uint16_t interval = _tapTempo.beatIntervalMs();
+                if (interval > 0 && phase < interval / 10)  // ~10% duty cycle
+                    _builtinLED[i] = CRGB::Green;
+            }
         } else {
             // Sync blink: brief red flash on a shared period so all scarves pulse together.
             float    floatTime = _timeMsec / (float)kSyncBlinkPeriodMs;

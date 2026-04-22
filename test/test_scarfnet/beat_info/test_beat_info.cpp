@@ -328,7 +328,7 @@ void test_beat_info_bar_frac8_at_downbeat() {
     TEST_ASSERT_EQUAL_UINT8(0, make(kInterval, 0, 0).frac8());
 }
 
-void test_beat_info_bar_frac8_at_bar_midpoint() {
+void test_beat_info_bar_frac8_at_midpoint() {
     // beat 2 of 4, phaseMs=0 → barPhase=1000, barMs=2000 → 1000*255/2000=127
     TEST_ASSERT_EQUAL_UINT8(127, make(kInterval, 0, 2).frac8());
 }
