@@ -88,14 +88,10 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         const uint32_t period     = (uint32_t)lerp8by8(160, 15, vibeFlow) * 100;  // 16000–1500 ms
 
         // Detect last beat of every 16-beat phrase for the burst
-        uint8_t phraseBurst = 0;
-        if (beat.isActive() && beat.intervalMs > 0) {
-            uint32_t beatCount = (uint32_t)(t / beat.intervalMs);
-            if ((beatCount % 16) == 15) {
-                // Fades from 255 → 0 over the course of that last beat
-                phraseBurst = beat.flashBrightness(beat.intervalMs);
-            }
-        }
+        // Fades from 255 → 0 over the course of that last beat
+        const uint8_t phraseBurst = ((beat.beatNumber % 16) == 15)
+            ? beat.flashBrightness(beat.intervalMs)
+            : 0;
 
         const uint32_t activePeriod = (phraseBurst > 0) ? 300u : period;
 

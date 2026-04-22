@@ -15,50 +15,10 @@
 //   isActive()               — true once two taps have established a tempo
 
 #include "mesh_types.h"
+#include "beat_info.h"
 #include <stdint.h>
 
 namespace Scarfnet {
-
-// Snapshot of beat state at a point in time. Passed to pattern render functions
-// so they can react to the beat without needing access to TapTempo directly.
-struct BeatInfo {
-    uint16_t intervalMs = 0;  // beat period; 0 = no active tempo
-    uint16_t phaseMs    = 0;  // ms elapsed since the last beat
-    uint16_t beatNumber = 0;
-    uint16_t barNumber  = 0;  // number of bars since tap tempo was established (optional, for patterns that want it)
-
-    BeatInfo() = default;
-    BeatInfo(uint16_t intervalMs, uint16_t phaseMs, uint16_t beatNumber) : intervalMs(intervalMs), phaseMs(phaseMs), beatNumber(beatNumber) {}
-
-    bool isActive() const { return intervalMs > 0; }
-
-    // True within `windowMs` of the beat onset.
-    bool isOnBeat(uint16_t windowMs = 60) const {
-        return isActive() && phaseMs < windowMs;
-    }
-
-    // TODO: Fix this method
-    bool isOnBar(uint16_t windowMs = 60) const {
-        return isActive() && phaseMs < windowMs;
-    }
-
-    // TODO: Fix this method
-    int getBeatNumber() const {
-        return isActive() ? beatNumber : 0;
-    }
-
-    // TODO: Fix this method
-    int getBarNumber() const {
-        int8_t kBeatsPerBar = 4;
-        return isActive() ? beatNumber / kBeatsPerBar : 0;
-    }
-
-    // Brightness for a flash that peaks at 255 on the beat and fades to 0 at `windowMs`.
-    uint8_t flashBrightness(uint16_t windowMs = 60) const {
-        if (!isOnBeat(windowMs)) return 0;
-        return (uint8_t)(255u - (uint32_t)phaseMs * 255u / windowMs);
-    }
-};
 
 struct TapTempo {
     // A tap gap longer than this resets the sequence (user stopped tapping).

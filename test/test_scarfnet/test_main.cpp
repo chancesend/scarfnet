@@ -1,5 +1,6 @@
 #include <unity.h>
 
+#include "beat_info/test_beat_info.h"
 #include "clock_sync/test_clock_sync.h"
 #include "heartbeat_framer/test_heartbeat_framer.h"
 #include "mesh/test_mesh.h"
@@ -26,6 +27,7 @@ int main( int argc, char **argv) {
     UNITY_BEGIN();
 
     RUN_TEST(test_simple);
+    beat_info_tests();
     clock_sync_tests();
     heartbeat_framer_tests();
     node_tracker_tests();
