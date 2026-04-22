@@ -1,6 +1,5 @@
 #include "OtaManager.h"
 #include "config.h"
-#include "version.h"
 #include "log.h"
 #include "login.h"
 
@@ -70,7 +69,7 @@ bool OtaManager::checkBootTrigger()
         }
     }
 
-    Scarfnet::log("[OTA] Entering OTA mode (firmware v%d) — receiver ready", FIRMWARE_VERSION);
+    Scarfnet::log("[OTA] Entering OTA mode (firmware v%d) — receiver ready", kScarfVersion);
     _active = true;
     WiFi.mode(WIFI_STA);
     return true;
@@ -161,7 +160,7 @@ bool OtaManager::computeFirmwareInfo()
 
 void OtaManager::enterServerMode()
 {
-    Scarfnet::log("[OTA] Entering server mode (firmware v%d)", FIRMWARE_VERSION);
+    Scarfnet::log("[OTA] Entering server mode (firmware v%d)", kScarfVersion);
     _mode = Mode::eServer;
 
     if (!computeFirmwareInfo())
@@ -171,7 +170,7 @@ void OtaManager::enterServerMode()
         return;
     }
 
-    String ssid = String(kOtaSsidPrefix) + FIRMWARE_VERSION;
+    String ssid = String(kOtaSsidPrefix) + kScarfVersion;
     WiFi.mode(WIFI_AP);
     WiFi.softAP(ssid.c_str(), kMeshPassword.c_str());
     Scarfnet::log("[OTA] AP: %s  IP: %s", ssid.c_str(), WiFi.softAPIP().toString().c_str());
@@ -186,14 +185,14 @@ void OtaManager::enterServerMode()
 
 void OtaManager::handleInfoRequest()
 {
-    if (!_webServer->authenticate(OTA_HTTP_USER, kMeshPassword.c_str()))
+    if (!_webServer->authenticate(kOtaHttpUser, kMeshPassword.c_str()))
     {
         _webServer->requestAuthentication();
         return;
     }
 
     JsonDocument doc;
-    doc["version"] = FIRMWARE_VERSION;
+    doc["version"] = kScarfVersion;
     doc["size"]    = _firmwareSize;
     doc["md5"]     = _firmwareMd5;
 
@@ -205,7 +204,7 @@ void OtaManager::handleInfoRequest()
 
 void OtaManager::handleFirmwareRequest()
 {
-    if (!_webServer->authenticate(OTA_HTTP_USER, kMeshPassword.c_str()))
+    if (!_webServer->authenticate(kOtaHttpUser, kMeshPassword.c_str()))
     {
         _webServer->requestAuthentication();
         return;
@@ -274,15 +273,15 @@ void OtaManager::receiverLoop()
             continue;
 
         int serverVersion = ssid.substring(strlen(kOtaSsidPrefix)).toInt();
-        if (serverVersion <= FIRMWARE_VERSION)
+        if (serverVersion <= kScarfVersion)
         {
             Scarfnet::log("[OTA] Found %s (v%d) — not newer than own v%d, skipping",
-                ssid.c_str(), serverVersion, FIRMWARE_VERSION);
+                ssid.c_str(), serverVersion, kScarfVersion);
             continue;
         }
 
         Scarfnet::log("[OTA] Found %s (v%d > own v%d) — attempting download",
-            ssid.c_str(), serverVersion, FIRMWARE_VERSION);
+            ssid.c_str(), serverVersion, kScarfVersion);
 
         WiFi.scanDelete();
         attemptDownload(ssid);
@@ -344,7 +343,7 @@ bool OtaManager::fetchFirmwareInfo(const String& base, int& serverVersion, size_
 {
     HTTPClient http;
     http.begin(base + "/info");
-    http.setAuthorization(OTA_HTTP_USER, kMeshPassword.c_str());
+    http.setAuthorization(kOtaHttpUser, kMeshPassword.c_str());
     int code = http.GET();
     if (code != 200)
     {
@@ -371,10 +370,10 @@ bool OtaManager::fetchFirmwareInfo(const String& base, int& serverVersion, size_
     firmwareMd5   = doc["md5"].as<String>();
 
     // Second version check: verify the payload, not just the SSID.
-    if (serverVersion <= FIRMWARE_VERSION)
+    if (serverVersion <= kScarfVersion)
     {
         Scarfnet::log("[OTA] /info reports v%d — not newer than own v%d, aborting",
-            serverVersion, FIRMWARE_VERSION);
+            serverVersion, kScarfVersion);
         _ledSetter(CRGB::Black);
         WiFi.disconnect();
         return false;
@@ -389,7 +388,7 @@ bool OtaManager::downloadAndFlash(const String& base, size_t firmwareSize, const
 {
     HTTPClient http;
     http.begin(base + "/firmware");
-    http.setAuthorization(OTA_HTTP_USER, kMeshPassword.c_str());
+    http.setAuthorization(kOtaHttpUser, kMeshPassword.c_str());
     int code = http.GET();
     if (code != 200)
     {

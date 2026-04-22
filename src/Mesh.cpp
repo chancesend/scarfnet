@@ -1,152 +1,190 @@
 #include "Mesh.h"
-#include "mesh_time.h"
+
+#ifdef SCARFNET_EMBEDDED
+
+#include "config.h"
+#include "clock_sync.h"
 #include "log.h"
 
-namespace Scarfnet
-{
+#include <WiFi.h>
+#include <esp_wifi.h>
+#include <Arduino.h>
+#include <cstring>
+#include <cmath>
 
-Mesh::Mesh(std::string ssid, std::string password, Scheduler *scheduler, uint16_t port)
-{
-    
-    _mesh.setDebugMsgTypes(ERROR | STARTUP | CONNECTION | MESH_STATUS | SYNC); // set before init() so that you can see error messages
-    _mesh.init(ssid.c_str(), password.c_str(), scheduler, port);
+namespace Scarfnet {
 
-    _mesh.onReceive([&](uint32_t from, TSTRING &msg)
-        { this->receivedCallback(from, msg); });
-    _mesh.onNewConnection([&](uint32_t nodeId)
-        {
-            Scarfnet::log("[MESH] NEW CONNECTION!!");
-            this->newConnectionCallback(nodeId);
-            });
-    _mesh.onDroppedConnection([&](uint32_t nodeId) 
-        { this->droppedConnectionCallback(nodeId); });
-    _mesh.onChangedConnections([&]()
-        { this->changedConnectionCallback(); });
-    _mesh.onNodeTimeAdjusted([&](int32_t offset)
-        { this->nodeTimeAdjustedCallback(offset); });
-    _mesh.onNodeDelayReceived([&](uint32_t nodeId, int32_t delay)
-        { this->delayReceivedCallback(nodeId, delay); });
-    Scarfnet::log("Mesh::Mesh");
+// Singleton pointer used by the static ESP-NOW callback.
+static Mesh* gMeshInstance = nullptr;
+
+static constexpr uint8_t kBroadcastMac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/*static*/ Mesh::NodeId Mesh::macToNodeId(const uint8_t* mac) {
+    return ((uint32_t)mac[2] << 24) | ((uint32_t)mac[3] << 16) |
+           ((uint32_t)mac[4] <<  8) |  (uint32_t)mac[5];
 }
 
-void Mesh::update()
-{
-    _mesh.update();
+Mesh::TimeMs Mesh::timeMs() const {
+    return _clock.timeMs(millis());
 }
 
-void Mesh::delayCalc()
-{
-    if (_calcDelay)
-    {
-        auto nodes = _mesh.getNodeList();
-        for (auto node : nodes)
-        {
-            _mesh.startDelayMeas(node);
-        }
-        _calcDelay = false;
+// ─── Lifecycle ──────────────────────────────────────────────────────────────
+
+void Mesh::begin() {
+    portMUX_INITIALIZE(&_rxMux);
+    gMeshInstance = this;
+
+    uint8_t mac[6];
+    WiFi.macAddress(mac);
+    _nodeId = macToNodeId(mac);
+    Scarfnet::log("[MESH] node ID %u  MAC %02X:%02X:%02X:%02X:%02X:%02X",
+                  _nodeId, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    // STA mode without connecting — required for ESP-NOW to function.
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(false);
+
+    // Fix the channel so all scarves can hear each other.
+    esp_wifi_set_channel(kEspNowChannel, WIFI_SECOND_CHAN_NONE);
+
+    if (esp_now_init() != ESP_OK) {
+        Scarfnet::log("[MESH] esp_now_init() FAILED");
+        while (true) delay(1000);
     }
+
+    esp_now_register_recv_cb(Mesh::espNowRecvCb);
+
+    // Register the broadcast peer so esp_now_send() accepts FF:FF:FF:FF:FF:FF.
+    esp_now_peer_info_t peer = {};
+    memcpy(peer.peer_addr, kBroadcastMac, 6);
+    peer.channel = kEspNowChannel;
+    peer.encrypt = false;
+    if (esp_now_add_peer(&peer) != ESP_OK) {
+        Scarfnet::log("[MESH] failed to add broadcast peer");
+    }
+
+    Scarfnet::log("[MESH] ESP-NOW ready on channel %u", kEspNowChannel);
 }
 
-void Mesh::receivedCallback(uint32_t from, String &msg)
-{
-    Scarfnet::log("[MESH][RCV node %u] msg=%s", from, msg.c_str());
-    JsonDocument doc;
-    auto err = deserializeJson(doc, msg);
-    if (err)
-    {
-        Scarfnet::log("[MESH][RCV] JSON parse error: %s", err.c_str());
+// ─── Loop ───────────────────────────────────────────────────────────────────
+
+void Mesh::update() {
+    // Drain the rx queue (filled by espNowRecvCb on the WiFi task).
+    while (true) {
+        RxEntry entry;
+        bool hasEntry = false;
+
+        portENTER_CRITICAL(&_rxMux);
+        if (_rxTail != _rxHead) {
+            entry   = _rxQueue[_rxTail];
+            _rxTail = (_rxTail + 1) % kRxQueueSize;
+            hasEntry = true;
+        }
+        portEXIT_CRITICAL(&_rxMux);
+
+        if (!hasEntry) break;
+        handleReceived(entry.mac, entry.data, entry.len);
+    }
+
+    _tracker.checkTimeouts(millis(), kNodeTimeoutMs, [this](NodeId nodeId) {
+        Scarfnet::log("[MESH] node %u timed out (peers: %u)", nodeId, (unsigned)_tracker.count());
+        if (_leftCb) _leftCb(nodeId);
+    });
+}
+
+// ─── ESP-NOW callback (WiFi task) ───────────────────────────────────────────
+
+/*static*/ void Mesh::espNowRecvCb(const uint8_t* mac, const uint8_t* data, int len) {
+    Mesh* self = gMeshInstance;
+    if (!self) return;
+
+    portENTER_CRITICAL(&self->_rxMux);
+    int next = (self->_rxHead + 1) % kRxQueueSize;
+    if (next != self->_rxTail) {
+        RxEntry& slot = self->_rxQueue[self->_rxHead];
+        memcpy(slot.mac,  mac,  6);
+        int copyLen = len < 250 ? len : 250;
+        memcpy(slot.data, data, copyLen);
+        slot.len      = copyLen;
+        self->_rxHead = next;
+    } else {
+        // Queue full; this packet is dropped. At 5-second heartbeat intervals
+        // with 16 nodes, the queue should never fill.
+        Scarfnet::log("[MESH] rx queue full — packet dropped");
+    }
+    portEXIT_CRITICAL(&self->_rxMux);
+}
+
+// ─── Receive (loop task) ────────────────────────────────────────────────────
+
+void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
+    HeartbeatPacket pkt = {};
+    if (!HeartbeatFramer::decode(data, len, pkt)) {
+        Scarfnet::log("[MESH][RCV] short packet (%d bytes) — ignoring", len);
         return;
     }
 
-    for (const auto& observer : _receivedDataObservers)
-    {
-        observer(doc);
+    if (pkt.scarfNetId != _scarfNetId) {
+        Scarfnet::log("[MESH][RCV] scarfNetId mismatch (got %u, ours %u) — dropped",
+                      pkt.scarfNetId, _scarfNetId);
+        return;
     }
-}
 
-void Mesh::newConnectionCallback(uint32_t nodeId)
-{
-    auto jsonLayout = _mesh.subConnectionJson(true);
-    Scarfnet::log("[MESH][NEW node %u] %s", nodeId, jsonLayout.c_str());
-    // changedConnectionCallback fires immediately after and notifies observers
-}
+    NodeId nodeId = macToNodeId(mac);
+    TimeMs now    = millis();
 
-void Mesh::droppedConnectionCallback(uint32_t nodeId)
-{
-    auto jsonLayout = _mesh.subConnectionJson(true);
-    Scarfnet::log("[MESH][DROP node %u] %s", nodeId, jsonLayout.c_str());
-    // changedConnectionCallback fires immediately after and notifies observers
-}
+    bool isNew = _tracker.saw(nodeId, now);
+    updateClock(pkt.currentTimeMs);
 
-void Mesh::printConnectionList()
-{
-    auto nodes = _mesh.getNodeList();
-    String line = String("Connection list (") + nodes.size() + " nodes):";
-    for (auto node : nodes)
-        line += String(" ") + node;
-    Scarfnet::log(line.c_str());
-}
+    Scarfnet::log("[MESH][RCV node %u] pattern=%s ci=%u peerTime=%u myTime=%u",
+                  nodeId, pkt.pattern, pkt.changeIndex, pkt.currentTimeMs, timeMs());
 
-void Mesh::changedConnectionCallback()
-{
-    Scarfnet::log("[MESH] Changed connections");
-    this->printConnectionList();
-    _calcDelay = true;
-
-    for (const auto& observer : _connectionObservers)
-    {
-        observer();
+    if (isNew) {
+        Scarfnet::log("[MESH] node %u joined (peers: %u)", nodeId, (unsigned)_tracker.count());
+        if (_joinedCb) _joinedCb(nodeId);
     }
+
+    if (_receivedCb) _receivedCb(pkt);
 }
 
-void Mesh::nodeTimeAdjustedCallback(int32_t offset)
-{
-    Scarfnet::log("[MESH] Adjusted time %ums. Offset = %d", this->getNodeTimeMs(), offset);
-}
+// ─── Clock sync ─────────────────────────────────────────────────────────────
 
-void Mesh::delayReceivedCallback(uint32_t from, int32_t delay)
-{
-    Scarfnet::log("[MESH] Delay to node %u is %d us", from, delay);
-}
+void Mesh::updateClock(TimeMs pktCurrentTimeMs) {
+    int32_t rawDelta  = (int32_t)pktCurrentTimeMs - (int32_t)millis();
+    bool    wasWarmed = _clock.isWarmedUp();
+    _clock.update(pktCurrentTimeMs, millis());
 
-uint32_t Mesh::getMeshNodeTimeRaw()
-{
-    return _mesh.getNodeTime();
-}
-
-/*static*/ uint32_t Mesh::computeNodeTimeMs(uint32_t rawNodeTime, int32_t& lastNodeTimeMs, int32_t& rolloverCount)
-{
-    return Scarfnet::computeNodeTimeMs(rawNodeTime, lastNodeTimeMs, rolloverCount);
-}
-
-uint32_t Mesh::getNodeTimeMs()
-{
-    return computeNodeTimeMs(_mesh.getNodeTime(), _lastNodeTimeMs, _rolloverCount);
-}
-
-void Mesh::recordArrivalDelta(uint32_t nodeId, int32_t rawDeltaMs)
-{
-    auto it = _nodeArrivalDeltas.find(nodeId);
-    if (it == _nodeArrivalDeltas.end())
-    {
-        _nodeArrivalDeltas[nodeId] = rawDeltaMs;
-        Scarfnet::log("[SWARM] node %u first delta: %dms", nodeId, rawDeltaMs);
+    if (!wasWarmed) {
+        Scarfnet::log("[SYNC] warmup %d/%d offset=%dms",
+                      _clock.samples, kClockWarmupSamples, rawDelta);
+        return;
     }
-    else
-    {
-        // Exponential moving average: new = 0.2*raw + 0.8*prev
-        // Converges to ~85% of a step change after ~10 heartbeats (~30s).
-        const float kAlpha = 0.2f;
-        int32_t smoothed = (int32_t)(kAlpha * rawDeltaMs + (1.0f - kAlpha) * it->second);
-        Scarfnet::log("[SWARM] node %u delta: raw=%dms smoothed=%dms", nodeId, rawDeltaMs, smoothed);
-        it->second = smoothed;
+
+    float deviation = fabsf((float)rawDelta - _clock.offset);
+    if (deviation > (float)kSwarmMaxClockDeviationMs) {
+        Scarfnet::log("[SYNC] deviation=%.0fms exceeds ±%dms — discarded",
+                      deviation, kSwarmMaxClockDeviationMs);
+        return;
     }
+
+    Scarfnet::log("[SYNC] offset=%.0fms raw=%dms", _clock.offset, rawDelta);
 }
 
-int32_t Mesh::getArrivalDelta(uint32_t nodeId) const
-{
-    auto it = _nodeArrivalDeltas.find(nodeId);
-    return (it != _nodeArrivalDeltas.end()) ? it->second : 0;
+// ─── Send ───────────────────────────────────────────────────────────────────
+
+void Mesh::broadcast(const HeartbeatPacket& pkt) {
+    HeartbeatPacket stamped = pkt;
+    stamped.scarfNetId = _scarfNetId;
+    int wireLen = 0;
+    const uint8_t* wireData = HeartbeatFramer::encode(stamped, wireLen);
+    esp_err_t result = esp_now_send(kBroadcastMac, wireData, (size_t)wireLen);
+    if (result != ESP_OK) {
+        Scarfnet::log("[MESH][SND] esp_now_send error %d", (int)result);
+    }
 }
 
 } // namespace Scarfnet
+
+#endif // SCARFNET_EMBEDDED

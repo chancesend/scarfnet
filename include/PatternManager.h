@@ -1,8 +1,10 @@
 #pragma once
 
+#include "mesh_types.h" // TimeMs
 #include "patterns.h"
 #include "palettes.h"
-#include "mesh.h"
+#include <cstdint>
+#include <memory>
 
 namespace Scarfnet
 {
@@ -20,15 +22,16 @@ public:
     // Returns the name of the currently active pattern.
     std::string getCurrentPattern();
 
-    // Renders the current pattern into leds using the given mesh timestamp.
-    void runCurrentPattern(Leds& leds, uint32_t nodeTimeMs);
+    // Renders the current pattern into leds using the given mesh timestamp and beat state.
+    void runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const BeatInfo& beat);
 
     // Advances to the next pattern and updates the randomizer seed from the press timestamp.
-    void incrementPattern(Mesh::TimeMs lastSelfPressMs);
+    void incrementPattern(TimeMs lastSelfPressMs);
     // Keeps the current pattern but re-seeds the randomizer for a different look.
-    void samePatternDifferentRandomizer(Mesh::TimeMs lastSelfPressMs);
+    void samePatternDifferentRandomizer(TimeMs lastSelfPressMs);
     // Switches to the named pattern with the given randomizer (used when syncing from a remote node).
-    void changePatternFromString(const std::string& pattern, Rnd randomizer);
+    // Returns true if the pattern was found and applied, false if the name was unrecognized.
+    bool changePatternFromString(const std::string& pattern, Rnd randomizer);
 
     // Steps the current palette one blend tick toward the target palette.
     void blendPalette();
@@ -41,6 +44,7 @@ private:
     CRGBPalette16 _currentPalette {CRGB::Black};
     CRGBPalette16 _targetPalette {RainbowColors_p};
     Rnd _currentRandomizer {0};
+    Rnd _localRnd          {0};  // re-randomized locally on each pattern/seed change
 
 
 };

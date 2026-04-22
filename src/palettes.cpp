@@ -3,8 +3,10 @@
 
 #include <vector>
 
-namespace Scarfnet 
+namespace Scarfnet
 {
+
+#if SCARFNET_EMBEDDED
 
 DEFINE_GRADIENT_PALETTE( ib_jul01_gp ) 
 {
@@ -553,5 +555,25 @@ CRGBPalette16 getColorPalette(int8_t i)
 
   return palette;
 }
+
+#else // !SCARFNET_EMBEDDED — native build: use the palettes from fastled_stub.h
+
+CRGBPalette16 getColorPalette(int8_t i)
+{
+    const CRGBPalette16 palettes[] = {
+        RainbowColors_p,
+        ForestColors_p,
+        CloudColors_p,
+        LavaColors_p,
+        OceanColors_p,
+        PartyColors_p,
+        HeatColors_p,
+        RainbowStripeColors_p,
+    };
+    const int n = (int)(sizeof(palettes) / sizeof(palettes[0]));
+    return palettes[((unsigned)i) % n];
+}
+
+#endif // SCARFNET_EMBEDDED
 
 } // namespace Scarfnet

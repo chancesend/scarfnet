@@ -1,37 +1,57 @@
 # TODO
 
-## Documentation
-- [x] Add code documentation for classes and methods
-
 ## Simplification
 
-- [x] Refactor LED setting logic of OtaManager into reusable / modular code
-- [x] Split OtaManager::attemptDownload into sub-functions
-- [x] Scarfnet::log should not need a line break at the end of the message
-- [x] Move configuration (timings, etc) into a dedicated file
+- [x] Mesh::TimeMs should be used instead of uint32_t for timestamps
+- [ ] Make `SCARFNET_EMBEDDED` a real PlatformIO build flag instead of hardcoding it in `defines.h`
+    - Currently `defines.h` has `#define SCARFNET_EMBEDDED (1)` unconditionally, so any header that includes `defines.h` pulls in FastLED and can't compile natively
+    - Fix: remove the hardcode from `defines.h`; add `-D SCARFNET_EMBEDDED=1` to the `build_flags` of the embedded env in `platformio.ini` only (not the native env)
+    - Benefit: `ObservableButton` (and anything else that includes `defines.h`) would compile natively, unlocking integration tests for the `ObservableButton` → `ButtonStateMachine` → observer path via the injectable `PollFn` constructor
 
 ## Architecture / Reliability
 
-- [x] Investigate edge cases: Scarves having been running for a very long time, lots of scarves in the network, really bad network conditions, etc
-
-## Time Sync Tuning
-
-- [x] Temporarily shorten heartbeat interval after a connection event to give painlessMesh more data points for time sync convergence, then restore the normal 3-second interval (e.g. 500ms for ~10 seconds after `onConnectionChange`)
-- [x] See if it helps to send out an extra sync packet after a scarf sends out a new pattern or palette
+- [ ] Investigate the logs for issues
+    - [ ] Crashes
+    - [ ] Disconnections
+    - [ ] Time syncing
+    - [ ] Network traffic
 
 ## Future Work
 
-- [x] OTA trigger/scaffold — boot with button held for 10s enters OTA mode (yellow blink); hold again 10s → server mode (purple blink); `min_spiffs` partition table set
-- [x] OTA transfer logic — receiver scans for `scarfnet-ota-v*` AP, double version check (SSID + `/info`), downloads via `HTTPClient` → `Update` library with MD5 verify; server streams running partition via `esp_partition_read()` over WPA2 AP + HTTP Basic Auth
+- [ ] Debug mode, to add a visual notification when scarf enters/leaves network, or other network event happens?
+- [ ] What sort of security can we put in place to make sure that scarves only listen to other scarves? (networkID/password?, or a checksum of some sort?)
+
+## Pattern enhancements
 - [ ] Add a couple of modes that attempt to do "swarming" logic by taking into account time-of-arrival delays between scarves, so that the LED patterns are not all the same (they are either offset in time, or do slightly different patterns for interesting visual effects)
-- 
+    - [ ] Add very slight delay of secondary nodes when playing received pattern?
+    - [ ] Can we make all the scarves extensions of the same pattern?
+- [ ] Work on "digital" effect
+
+## Party mode (tap-tempo) ideas
+- [x] For tap-tempo mode, we should take our tempo taps on the press of the button, not the release
+- [x] All modes should have some sort of party mode variant
+
+
+## Log Visualizations
+
+- [ ] Investigate neighbor routing for certain messages, to reduce traffic and hops
+        NeighbourPackage pkg;
+        mesh.sendPackage(&pkg);
+- [ ] Investigate painlessMesh plugin system for routing different kinds of nodes
+        https://alteriom.github.io/painlessMesh/#/architecture/plugin-system
+- [ ] Show node joined/dropped events as spans in time on their own lane
+
+## ESP-NOW Port (see docs/plan-espnow-port.md)
+- [ ] **Phase 5 — Full fleet range test**
+    - [ ] Deploy all 16 scarves in a festival-like space
+    - [ ] Walk scarves apart to find range limit
+    - [ ] Confirm all nodes receive broadcasts from all others
+    - [ ] Evaluate whether flooding (TTL re-broadcast) is needed for range
 
 ## Investigations
 
-- [ ] See what stability we see regarding time deltas between scarves - do they drift with space? What sort of clock jitter do we have?
-- [ ] What sort of network traffic are we dealing with, relative to what is being sent? How does this scale with the number of scarves? Is there a point at which we will start seeing problems? I currently have 16 scarves that could be active at any one time - how large could this scale?
-
-## Unit Tests
-
-- [x] Test `Scarf::onReceivedData` sync logic — extract `changeIndex`/rollover acceptance logic into a testable free function or struct (currently private and hardware-coupled)
-- [ ] Add tests for `ObservableButton` state machine — press → long press → extra-long press transition sequence
+- [ ] Investigate whether the "clock settling" gate is actually helping, or if it is causing more problems when there are unstable networks
+- [ ] Investigate running on Zigbee (would require an upgraded ESP32)
+- [ ] What refactorings would make this more extensible and modular?
+- [ ] Figure out if there's a better way to form the network ad-hoc via button presses
+- [x] Is there a way we can visualize the patterns natively? Figure out a way to simulate N scarves, so that we can simulate how different patterns will look in the real scarves

@@ -21,13 +21,15 @@ std::string PatternManager::getCurrentPattern()
     return _currentPattern->first;
 }
 
-void PatternManager::runCurrentPattern(Leds& leds, uint32_t nodeTimeMs)
+void PatternManager::runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const BeatInfo& beat)
 {
-    _currentPattern->second(
-        leds,
-        nodeTimeMs,
-        _currentPalette,
-        _currentRandomizer);
+    PatternContext ctx;
+    ctx.timeMs   = nodeTimeMs;
+    ctx.palette  = _currentPalette;
+    ctx.rnd      = _currentRandomizer;
+    ctx.localRnd = _localRnd;
+    ctx.beat     = beat;
+    _currentPattern->second(leds, ctx);
 }
 
 void PatternManager::initPatterns()
@@ -37,7 +39,7 @@ void PatternManager::initPatterns()
     _currentPattern = _patterns.begin();
 }
 
-void PatternManager::incrementPattern(Mesh::TimeMs lastSelfPressMs)
+void PatternManager::incrementPattern(TimeMs lastSelfPressMs)
 {
     auto newPattern = _currentPattern + 1;
     if (newPattern == _patterns.end())
@@ -50,7 +52,7 @@ void PatternManager::incrementPattern(Mesh::TimeMs lastSelfPressMs)
     changePatternFromString(newPattern->first, randomizer);
 }
 
-void PatternManager::samePatternDifferentRandomizer(Mesh::TimeMs lastSelfPressMs)
+void PatternManager::samePatternDifferentRandomizer(TimeMs lastSelfPressMs)
 {
     auto newPattern = _currentPattern;
     const auto newName = newPattern->first.c_str();
@@ -59,20 +61,23 @@ void PatternManager::samePatternDifferentRandomizer(Mesh::TimeMs lastSelfPressMs
     changePatternFromString(newPattern->first, randomizer);
 }
 
-void PatternManager::changePatternFromString(const std::string &pattern, Rnd randomizer)
+bool PatternManager::changePatternFromString(const std::string &pattern, Rnd randomizer)
 {
     auto found = std::find_if(_patterns.begin(), _patterns.end(), [pattern](const NamedPattern &it) -> bool
                                 { return (pattern == it.first); });
     if (found != _patterns.end())
     {
-        _currentPattern = found;
+        _currentPattern    = found;
         _currentRandomizer = randomizer;
-        _targetPalette = getColorPalette(randomizer);
-        Scarfnet::log("Changing pattern: %s (randomizer %i)", found->first.c_str(), _currentRandomizer);
+        _localRnd          = (Rnd)random16();  // fresh per-device seed; varies between scarves
+        _targetPalette     = getColorPalette(randomizer);
+        Scarfnet::log("Changing pattern: %s (randomizer %i localRnd %u)", found->first.c_str(), _currentRandomizer, _localRnd);
+        return true;
     }
     else
     {
-        Scarfnet::log("Pattern: %s not found!", found->first.c_str());
+        Scarfnet::log("Pattern: %s not found — ignoring update", pattern.c_str());
+        return false;
     }
 }
 
