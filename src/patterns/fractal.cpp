@@ -50,7 +50,7 @@ void fractal(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
     // the beat lights up the noise peaks and leaves the valleys dim, reinforcing
     // the fractal structure instead of washing it out with uniform white.
     if (beat.isActive()) {
-        uint8_t flash = beat.flashBrightness(100);
+        uint8_t flash = beat.sawTime(100);
         if (flash > 0) {
             uint8_t flashHue = (uint8_t)(rnd * 17u >> 8);
             CRGB flashColor = ColorFromPalette(palette, flashHue, 255, LINEARBLEND);

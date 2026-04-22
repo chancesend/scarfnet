@@ -39,7 +39,7 @@ void dance(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 
     const uint16_t beatNum     = (uint16_t)((timeMs - (int32_t)beat.phaseMs) / beat.intervalMs);
     const bool     wildWindow  = (beatNum % macroPeriod) < 2;  // first 2 beats of macro phrase
-    const uint8_t  flash       = beat.flashBrightness(beat.intervalMs / 2);
+    const uint8_t  flash       = beat.sawTime(beat.intervalMs / 2);
 
     // ── Layer 1: Beat brightness pulse ────────────────────────────────────────
     uint8_t brightness = wildWindow ? 255 : lerp8by8(50, 255, flash);

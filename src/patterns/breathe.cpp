@@ -27,7 +27,7 @@ void breathe(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
     // the natural sine peak, then vanishes quickly. Wider window (150 ms) and full
     // blend amount make it feel like a caught breath against the slow rhythm.
     if (beat.isActive()) {
-        uint8_t flash = beat.flashBrightness(150);
+        uint8_t flash = beat.sawTime(150);
         if (flash > 0) {
             // Quarter-turn hue offset from the current breath color + rnd tint
             uint8_t flashHue = hue + 96 + (uint8_t)(rnd * 23u >> 8);

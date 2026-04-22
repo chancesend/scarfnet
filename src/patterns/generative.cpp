@@ -90,7 +90,7 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         // Detect last beat of every 16-beat phrase for the burst
         // Fades from 255 → 0 over the course of that last beat
         const uint8_t phraseBurst = ((beat.beatNumber % 16) == 15)
-            ? beat.flashBrightness(beat.intervalMs)
+            ? beat.saw(255, 0)
             : 0;
 
         const uint32_t activePeriod = (phraseBurst > 0) ? 300u : period;
@@ -156,7 +156,7 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
     // sparse at the tail — like sparks thrown by an impact. Each frame during
     // the ~100 ms window fires a different random subset, giving an organic burst.
     if (beat.isActive()) {
-        uint8_t flash = beat.flashBrightness(100);
+        uint8_t flash = beat.sawTime(100);
         if (flash > 0) {
             uint8_t flashHue = (uint8_t)(rnd * 17u >> 8);
             for (int i = 0; i < kNumLeds; ++i) {

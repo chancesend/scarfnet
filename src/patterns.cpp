@@ -35,8 +35,8 @@ PatternList getPatternList()
         // Palette-colored swell on the beat — hue from rnd so each fleet session
         // gets a distinct accent color rather than always washing to white.
         if (ctx.beat.isActive()) {
-            int flashBrightness = rndRange(ctx.localRnd xor ctx.timeMs, 0, 255);  // launch cycle length
-            uint8_t flash = ctx.beat.flashBrightness(flashBrightness);
+            uint16_t flashWindow = rndRange(ctx.localRnd xor ctx.timeMs, 0, 255);  // randomised decay window
+            uint8_t flash = ctx.beat.sawTime(flashWindow);
             if (flash > 0) {
                 CRGB flashColor = ColorFromPalette(ctx.palette, (uint8_t)(ctx.rnd * 17u >> 8), 255, LINEARBLEND);
                 for (auto& led : leds) led = blend(led, flashColor, flash >> 2);

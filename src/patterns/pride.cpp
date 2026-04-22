@@ -47,7 +47,7 @@ void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatI
 
     // On-beat white flash: blend all LEDs toward white, fading over ~60ms.
     if (beat.isActive()) {
-        uint8_t flash = beat.flashBrightness();
+        uint8_t flash = beat.sawTime();
         if (flash > 0) {
             for (auto& led : leds)
                 led = blend(led, CRGB::White, flash / 2);
