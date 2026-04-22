@@ -20,16 +20,9 @@ void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatI
     uint16_t deltams = ms - sLastMillis;
     sLastMillis = ms;
 
-    // Phrase-end fill: 3× speed for the last bar (4 beats) of every 16-bar phrase.
+    // Phrase-end fill: 5× speed for the last beat of every 16-beat phrase.
     // Builds tension into the phrase boundary without touching anything visual directly.
-    uint8_t speedMult = 1;
-    if (beat.isActive() && beat.intervalMs > 0) {
-        uint32_t beatCount = (uint32_t)((uint32_t)timeMs / beat.intervalMs);
-        const int32_t phraseLength = 16;
-        if ((beatCount % phraseLength) >= phraseLength - 1) {
-            speedMult = 5;
-        }
-    }
+    const uint8_t speedMult = ((beat.beatNumber % 16) == 15) ? 5 : 1;
 
     sPseudotime += deltams * msmultiplier * speedMult;
     sHue16 += deltams * beatsin88(400, 5, 9) * speedMult;

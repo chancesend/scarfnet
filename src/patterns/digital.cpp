@@ -12,7 +12,7 @@ void digital(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         if (ctx.beat.isOnBeat(100)) {
             hue += rndRange(ctx.localRnd xor ctx.localRnd, 10, 50);
         }
-        if (i % 8 == ctx.beat.getBarNumber()) {
+        if (i % 8 == ctx.beat.barNumber() % 8) {
             brightness = 255;
         }
         leds[i] = ColorFromPalette(palette, hue, brightness, LINEARBLEND);
