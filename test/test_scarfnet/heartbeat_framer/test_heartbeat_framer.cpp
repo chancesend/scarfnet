@@ -6,6 +6,13 @@
 using Scarfnet::HeartbeatFramer;
 using Scarfnet::HeartbeatPacket;
 
+// ─── layout ──────────────────────────────────────────────────────────────────
+
+void test_packet_pattern_at_offset_32()
+{
+    TEST_ASSERT_EQUAL_size_t(32, offsetof(HeartbeatPacket, pattern));
+}
+
 // ─── crc32 ───────────────────────────────────────────────────────────────────
 
 void test_framer_crc32_known_value()
@@ -40,10 +47,10 @@ void test_framer_decode_exact_size_succeeds()
 {
     HeartbeatPacket src = {};
     src.id            = 0x12345678;
-    src.lastPress     = 9999;
+    src.lastPressMs     = 9999;
     src.currentTimeMs = 100000;
     src.changeIndex   = 7;
-    src.randomizer    = 42;
+    src.globalRandomizer    = 42;
     memcpy(src.pattern, "pride", 6);
 
     int wireLen = 0;
@@ -52,10 +59,10 @@ void test_framer_decode_exact_size_succeeds()
     HeartbeatPacket out = {};
     TEST_ASSERT_TRUE(HeartbeatFramer::decode(wire, wireLen, out));
     TEST_ASSERT_EQUAL_UINT32(0x12345678, out.id);
-    TEST_ASSERT_EQUAL_UINT32(9999,       out.lastPress);
+    TEST_ASSERT_EQUAL_UINT32(9999,       out.lastPressMs);
     TEST_ASSERT_EQUAL_UINT32(100000,     out.currentTimeMs);
     TEST_ASSERT_EQUAL_UINT32(7,          out.changeIndex);
-    TEST_ASSERT_EQUAL_UINT16(42,         out.randomizer);
+    TEST_ASSERT_EQUAL_UINT16(42,         out.globalRandomizer);
     TEST_ASSERT_EQUAL_STRING("pride",    out.pattern);
 }
 
@@ -200,10 +207,10 @@ void test_framer_round_trip_preserves_all_fields()
 {
     HeartbeatPacket orig = {};
     orig.id            = 0x11223344;
-    orig.lastPress     = 55555;
+    orig.lastPressMs     = 55555;
     orig.currentTimeMs = 1000000;
     orig.changeIndex   = 99;
-    orig.randomizer    = 200;
+    orig.globalRandomizer    = 200;
     memcpy(orig.pattern, "firework", 9);
 
     int len = 0;
@@ -213,10 +220,10 @@ void test_framer_round_trip_preserves_all_fields()
     TEST_ASSERT_TRUE(HeartbeatFramer::decode(wire, len, decoded));
 
     TEST_ASSERT_EQUAL_UINT32(orig.id,            decoded.id);
-    TEST_ASSERT_EQUAL_UINT32(orig.lastPress,     decoded.lastPress);
+    TEST_ASSERT_EQUAL_UINT32(orig.lastPressMs,     decoded.lastPressMs);
     TEST_ASSERT_EQUAL_UINT32(orig.currentTimeMs, decoded.currentTimeMs);
     TEST_ASSERT_EQUAL_UINT32(orig.changeIndex,   decoded.changeIndex);
-    TEST_ASSERT_EQUAL_UINT16(orig.randomizer,    decoded.randomizer);
+    TEST_ASSERT_EQUAL_UINT16(orig.globalRandomizer,    decoded.globalRandomizer);
     TEST_ASSERT_EQUAL_STRING(orig.pattern,       decoded.pattern);
 }
 
@@ -224,6 +231,9 @@ void test_framer_round_trip_preserves_all_fields()
 
 void heartbeat_framer_tests()
 {
+    // layout
+    RUN_TEST(test_packet_pattern_at_offset_32);
+
     // crc32
     RUN_TEST(test_framer_crc32_known_value);
     RUN_TEST(test_framer_crc32_empty_is_zero);

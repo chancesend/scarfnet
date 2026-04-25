@@ -23,12 +23,14 @@ public:
     std::string getCurrentPattern();
 
     // Renders the current pattern into leds using the given mesh timestamp and beat state.
-    void runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const BeatInfo& beat);
+    void runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const BeatInfo& beat,
+                           NodeId nodeId, NodeId lastPressId,
+                           const NodeFlash* flashes, int flashCount);
 
     // Advances to the next pattern and updates the randomizer seed from the press timestamp.
-    void incrementPattern(TimeMs lastSelfPressMs);
+    void incrementPattern(Rnd randomizer);
     // Keeps the current pattern but re-seeds the randomizer for a different look.
-    void samePatternDifferentRandomizer(TimeMs lastSelfPressMs);
+    void samePatternDifferentRandomizer(Rnd randomizer);
     // Switches to the named pattern with the given randomizer (used when syncing from a remote node).
     // Returns true if the pattern was found and applied, false if the name was unrecognized.
     bool changePatternFromString(const std::string& pattern, Rnd randomizer);

@@ -6,7 +6,7 @@
 // ── Scarf firmware version ───────────────────────────────────────────────────
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
-const uint16_t kScarfVersion              = 12;
+const uint16_t kScarfVersion              = 13;
 
 // ── ObservableButton ─────────────────────────────────────────────────────────
 const uint32_t kButtonPollIntervalMs       = 50;
@@ -35,10 +35,10 @@ const int      kBurstSyncCount            = 3;
 // ── Tap-tempo ────────────────────────────────────────────────────────────────
 // Set true  → long press toggles tap-tempo mode (short press feeds the beat).
 // Set false → long press restores original "same pattern, new randomizer" behaviour.
-const bool kTapTempoOnLongPress           = true;
-
-// HTTP Basic Auth username for OTA endpoints. Password is kMeshPassword (login.h).
-constexpr const char* kOtaHttpUser        = "scarfnet";
+const bool  kTapTempoOnLongPress          = true;
+// Taps whose implied BPM falls outside this range are ignored.
+const float kTapMinBpm                    = 30.0f;
+const float kTapMaxBpm                    = 300.0f;
 
 // ── ESP-NOW ───────────────────────────────────────────────────────────────────
 // All scarves must use the same channel. Channel 6 avoids overlap with channels

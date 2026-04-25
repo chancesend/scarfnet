@@ -56,9 +56,57 @@ void test_tap_tempo_tap_exactly_at_max_gap_resets() {
 
 void test_tap_tempo_tap_just_under_max_gap_keeps_active() {
     TapTempo tt;
+    // 1000ms = 60 BPM — well within valid range and under kMaxGapMs
     tt.tap(0);
-    tt.tap(TapTempo::kMaxGapMs - 1);
+    tt.tap(1000);
     TEST_ASSERT_TRUE(tt.isActive());
+}
+
+// ─── BPM range filter ────────────────────────────────────────────────────────
+
+void test_tap_tempo_rejects_too_slow_tap() {
+    // 2500ms interval = 24 BPM, below kTapMinBpm (30). Should not become active.
+    TapTempo tt;
+    tt.tap(0);
+    tt.tap(2500);
+    TEST_ASSERT_FALSE(tt.isActive());
+    TEST_ASSERT_EQUAL_UINT16(0, tt.beatIntervalMs());
+}
+
+void test_tap_tempo_rejects_too_fast_tap() {
+    // 100ms interval = 600 BPM, above kTapMaxBpm (240). Should not become active.
+    TapTempo tt;
+    tt.tap(0);
+    tt.tap(100);
+    TEST_ASSERT_FALSE(tt.isActive());
+    TEST_ASSERT_EQUAL_UINT16(0, tt.beatIntervalMs());
+}
+
+void test_tap_tempo_accepts_min_bpm_boundary() {
+    // 2000ms = exactly 30 BPM (kTapMinBpm). Should become active.
+    TapTempo tt;
+    tt.tap(0);
+    tt.tap(2000);
+    TEST_ASSERT_TRUE(tt.isActive());
+}
+
+void test_tap_tempo_accepts_max_bpm_boundary() {
+    // 250ms = exactly 240 BPM (kTapMaxBpm). Should become active.
+    TapTempo tt;
+    tt.tap(0);
+    tt.tap(250);
+    TEST_ASSERT_TRUE(tt.isActive());
+}
+
+void test_tap_tempo_invalid_tap_does_not_reset_active_tempo() {
+    // Establish a tempo, then tap out-of-range. Tempo should be preserved.
+    TapTempo tt;
+    tt.tap(0);
+    tt.tap(500);  // 120 BPM, active
+    TEST_ASSERT_TRUE(tt.isActive());
+    tt.tap(600);  // 100ms later = 600 BPM, too fast — ignored
+    TEST_ASSERT_TRUE(tt.isActive());
+    TEST_ASSERT_UINT16_WITHIN(5, 500, tt.beatIntervalMs());
 }
 
 // ─── Smoothing ───────────────────────────────────────────────────────────────
@@ -147,6 +195,11 @@ void tap_tempo_tests() {
     RUN_TEST(test_tap_tempo_large_gap_resets);
     RUN_TEST(test_tap_tempo_tap_exactly_at_max_gap_resets);
     RUN_TEST(test_tap_tempo_tap_just_under_max_gap_keeps_active);
+    RUN_TEST(test_tap_tempo_rejects_too_slow_tap);
+    RUN_TEST(test_tap_tempo_rejects_too_fast_tap);
+    RUN_TEST(test_tap_tempo_accepts_min_bpm_boundary);
+    RUN_TEST(test_tap_tempo_accepts_max_bpm_boundary);
+    RUN_TEST(test_tap_tempo_invalid_tap_does_not_reset_active_tempo);
     RUN_TEST(test_tap_tempo_smoothing_converges);
     RUN_TEST(test_tap_tempo_beat_phase_zero_immediately_after_tap);
     RUN_TEST(test_tap_tempo_beat_phase_progresses);

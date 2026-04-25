@@ -1,7 +1,8 @@
 #pragma once
 
 #include "defines.h"
-#include "tap_tempo.h"  // BeatInfo
+#include "mesh_types.h"  // NodeId, TimeMs
+#include "tap_tempo.h"   // BeatInfo
 
 #include <stdint.h>
 #include <string>
@@ -9,13 +10,26 @@
 namespace Scarfnet
 {
 
+// Recent heartbeat arrival, used by the debug pattern for per-node flash effects.
+struct NodeFlash {
+    NodeId id;    // sender node ID
+    TimeMs when;  // mesh time the heartbeat was received
+};
+constexpr int kMaxNodeFlashes = 16;
+
 // All context a pattern needs to render one frame.
 struct PatternContext {
-    TimeMs       timeMs;    // synchronized mesh time — use for all animation timing
+    TimeMs        timeMs;    // synchronized mesh time — use for all animation timing
     CRGBPalette16 palette;   // current blended palette
-    Rnd           rnd;       // fleet-synchronized seed (last button press; same on all scarves)
-    Rnd           localRnd;  // per-device seed (node ID; unique per scarf, never transmitted)
+    Rnd           rnd;       // fleet-synchronized seed (same on all scarves)
+    Rnd           localRnd;  // per-device seed (unique per scarf, never transmitted)
     BeatInfo      beat;      // tap-tempo beat state
+
+    // Mesh identity — populated by Scarf, used by the debug pattern.
+    NodeId    nodeId;                          // this scarf's own node ID
+    NodeId    lastPressId;                     // node that last changed the pattern
+    NodeFlash recentFlashes[kMaxNodeFlashes];  // recent heartbeat arrivals (ring buffer)
+    int       flashCount;                      // valid entries in recentFlashes
 };
 
 typedef std::function<void(Leds&, const PatternContext&)> PatternFcn;
@@ -55,6 +69,7 @@ void dance(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatI
 void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, Rnd rnd, Rnd localRnd);
 void fillNoise(Leds& leds, int32_t timeMs);
 void digital(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const PatternContext& ctx);
+void debug(Leds& leds, const PatternContext& ctx);
 
 
 // ── Pattern registry ─────────────────────────────────────────────────────────

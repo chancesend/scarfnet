@@ -11,6 +11,10 @@ PatternList getPatternList()
     Scarfnet::log("getPatternList()");
     PatternList patterns;
 
+    patterns.push_back({"debug", [](Leds& leds, const PatternContext& ctx) {
+        debug(leds, ctx);
+    }});
+
     patterns.push_back({"pride", [](Leds& leds, const PatternContext& ctx) {
         pride(leds, ctx.timeMs, ctx.palette, ctx.beat);
     }});

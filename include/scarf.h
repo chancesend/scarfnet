@@ -58,15 +58,22 @@ private:
     void onNodeJoined(Mesh::NodeId nodeId);
     void onNodeLeft(Mesh::NodeId nodeId);
     void onReceived(const HeartbeatPacket& pkt);
+    void debugModeUpdate(const HeartbeatPacket& pkt);
 
     Mesh::TimeMs _timeMsec                  {0};
 
     ObservableButton _nextPatternButton;
     Mesh::TimeMs     _lastSelfButtonPressMs {0};
+    Mesh::NodeId     _lastPressId           {0};  // node that last changed the pattern
     bool             _onFlag        {false};
 
     TapTempo _tapTempo;
-    bool     _tapTempoMode {false};  // true = long-press entered tap-tempo input mode
+    bool     _tapTempoMode     {false};  // true = long-press entered tap-tempo input mode
+    bool     _newerVersionSeen {false};  // true if any peer has a higher firmware version
+    Rnd      _globalRandomizer {0};      // random seed broadcast with each pattern change
+
+    NodeFlash _nodeFlashes[kMaxNodeFlashes] {};
+    int       _nodeFlashCount {0};
 
     Preferences _preferences;
 

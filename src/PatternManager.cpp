@@ -21,14 +21,20 @@ std::string PatternManager::getCurrentPattern()
     return _currentPattern->first;
 }
 
-void PatternManager::runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const BeatInfo& beat)
+void PatternManager::runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const BeatInfo& beat,
+                                       NodeId nodeId, NodeId lastPressId,
+                                       const NodeFlash* flashes, int flashCount)
 {
     PatternContext ctx;
-    ctx.timeMs   = nodeTimeMs;
-    ctx.palette  = _currentPalette;
-    ctx.rnd      = _currentRandomizer;
-    ctx.localRnd = _localRnd;
-    ctx.beat     = beat;
+    ctx.timeMs      = nodeTimeMs;
+    ctx.palette     = _currentPalette;
+    ctx.rnd         = _currentRandomizer;
+    ctx.localRnd    = _localRnd;
+    ctx.beat        = beat;
+    ctx.nodeId      = nodeId;
+    ctx.lastPressId = lastPressId;
+    ctx.flashCount  = flashCount;
+    for (int i = 0; i < flashCount; i++) ctx.recentFlashes[i] = flashes[i];
     _currentPattern->second(leds, ctx);
 }
 
@@ -39,26 +45,19 @@ void PatternManager::initPatterns()
     _currentPattern = _patterns.begin();
 }
 
-void PatternManager::incrementPattern(TimeMs lastSelfPressMs)
+void PatternManager::incrementPattern(Rnd randomizer)
 {
     auto newPattern = _currentPattern + 1;
     if (newPattern == _patterns.end())
-    {
         newPattern = _patterns.begin();
-    }
-    const auto newName = newPattern->first.c_str();
-    Scarfnet::log("Scarf::incrementPattern(). Changing pattern to %s", newName);
-    const auto randomizer = lastSelfPressMs;
+    Scarfnet::log("Scarf::incrementPattern(). Changing pattern to %s", newPattern->first.c_str());
     changePatternFromString(newPattern->first, randomizer);
 }
 
-void PatternManager::samePatternDifferentRandomizer(TimeMs lastSelfPressMs)
+void PatternManager::samePatternDifferentRandomizer(Rnd randomizer)
 {
-    auto newPattern = _currentPattern;
-    const auto newName = newPattern->first.c_str();
-    Scarfnet::log("Scarf::samePatternDifferentRandomizer(). Keeping pattern at %s", newName);
-    const auto randomizer = lastSelfPressMs;
-    changePatternFromString(newPattern->first, randomizer);
+    Scarfnet::log("Scarf::samePatternDifferentRandomizer(). Keeping pattern at %s", _currentPattern->first.c_str());
+    changePatternFromString(_currentPattern->first, randomizer);
 }
 
 bool PatternManager::changePatternFromString(const std::string &pattern, Rnd randomizer)

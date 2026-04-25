@@ -1,7 +1,5 @@
 #pragma once
 
-// defines.h sets SCARFNET_EMBEDDED for the embedded target; include it first
-// so the guard below works regardless of include order in the caller.
 #include "defines.h"
 
 #ifdef SCARFNET_EMBEDDED

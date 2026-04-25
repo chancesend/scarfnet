@@ -1,4 +1,4 @@
-#include "Scarf.h"
+#include "scarf.h"
 
 #include "config.h"
 #include "defines.h"
@@ -32,12 +32,13 @@ Scarf::Scarf() :
 void Scarf::sendMessage()
 {
     HeartbeatPacket pkt = {};
-    pkt.id            = _mesh->nodeId();
-    pkt.lastPress     = _lastSelfButtonPressMs;
-    pkt.currentTimeMs = _mesh->timeMs();
-    pkt.changeIndex   = _changeIndex;
-    pkt.randomizer    = (uint16_t)_lastSelfButtonPressMs;
-    pkt.version       = kScarfVersion;
+    pkt.id               = _mesh->nodeId();
+    pkt.version          = kScarfVersion;
+    pkt.currentTimeMs    = _mesh->timeMs();
+    pkt.lastPressMs      = _lastSelfButtonPressMs;
+    pkt.lastPressId      = _lastPressId;
+    pkt.changeIndex      = _changeIndex;
+    pkt.globalRandomizer = _globalRandomizer;
     pkt.beatIntervalMs = _tapTempo.beatIntervalMs();
     pkt.beatPhaseMs    = _tapTempo.beatPhaseMs(pkt.currentTimeMs);
 
@@ -55,7 +56,7 @@ void Scarf::sendMessage()
     _taskSendMessage.setInterval(kHeartbeatIntervalMs + jitter);
     Scarfnet::log("[SND] id=%u pattern=%s ci=%u time=%u rnd=%u ver=%u",
                   pkt.id, pkt.pattern, pkt.changeIndex, pkt.currentTimeMs,
-                  pkt.randomizer, pkt.version);
+                  pkt.globalRandomizer, pkt.version);
 }
 
 void Scarf::onNodeJoined(Mesh::NodeId nodeId)
@@ -76,8 +77,40 @@ void Scarf::onNodeLeft(Mesh::NodeId nodeId)
     _blinkNoNodes.setIterations((int)_mesh->nodeCount() * 2);
 }
 
+void Scarf::debugModeUpdate(const HeartbeatPacket& pkt) {
+    // Record this heartbeat for the debug pattern flash effect.
+    // Find existing entry for this node and update it, or add/replace.
+    bool found = false;
+    for (int i = 0; i < _nodeFlashCount; i++) {
+        if (_nodeFlashes[i].id == pkt.id) {
+            _nodeFlashes[i].when = _timeMsec;
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        if (_nodeFlashCount < kMaxNodeFlashes) {
+            _nodeFlashes[_nodeFlashCount++] = {pkt.id, _timeMsec};
+        } else {
+            // Replace oldest entry.
+            int oldest = 0;
+            for (int i = 1; i < kMaxNodeFlashes; i++)
+                if (_nodeFlashes[i].when < _nodeFlashes[oldest].when) oldest = i;
+            _nodeFlashes[oldest] = {pkt.id, _timeMsec};
+        }
+    }
+}
+
 void Scarf::onReceived(const HeartbeatPacket& pkt)
 {
+    if (pkt.version > kScarfVersion)
+        _newerVersionSeen = true;
+        
+    this->debugModeUpdate(pkt);
+
+    if (!shouldAcceptUpdate(pkt.changeIndex, _changeIndex))
+        return;
+
     // Sync beat info from any scarf that has an active tap-tempo.
     // Don't overwrite our own if we're the one tapping.
     if (pkt.beatIntervalMs != 0 && !_tapTempoMode) {
@@ -86,16 +119,14 @@ void Scarf::onReceived(const HeartbeatPacket& pkt)
         _tapTempo.reset();
     }
 
-    if (!shouldAcceptUpdate(pkt.changeIndex, _changeIndex))
-        return;
-
     Scarfnet::log("[SCARF][RCV] accepting pattern=%s randomizer=%u ci=%u from node %u",
-                  pkt.pattern, pkt.randomizer, pkt.changeIndex, pkt.id);
-    if (!_patternManager->changePatternFromString(pkt.pattern, pkt.randomizer))
+                  pkt.pattern, pkt.globalRandomizer, pkt.changeIndex, pkt.id);
+    if (!_patternManager->changePatternFromString(pkt.pattern, pkt.globalRandomizer))
         return;  // unknown pattern — don't advance change index or last-press timestamp
 
     _changeIndex            = rolloverGuard(pkt.changeIndex);
-    _lastSelfButtonPressMs  = rolloverGuard(pkt.lastPress);
+    _lastSelfButtonPressMs  = rolloverGuard(pkt.lastPressMs);
+    _lastPressId            = pkt.lastPressId;
 }
 
 void Scarf::setup()
@@ -179,11 +210,13 @@ void Scarf::processEvent(const ObservableButton::Event& event)
         {
             if (!_tapTempoMode) {
                 _lastSelfButtonPressMs = _mesh->timeMs();
-                _patternManager->incrementPattern(_lastSelfButtonPressMs);
+                _lastPressId      = _mesh->nodeId();
+                _globalRandomizer = (Rnd)random();
+                _patternManager->incrementPattern(_globalRandomizer);
                 _changeIndex += 1;
                 Scarfnet::log("ePress → pattern=%s randomizer=%u ci=%u",
                     _patternManager->getCurrentPattern().c_str(),
-                    (uint16_t)_lastSelfButtonPressMs, _changeIndex);
+                    _globalRandomizer, _changeIndex);
                 _taskSendMessage.forceNextIteration();
             }
             break;
@@ -197,11 +230,13 @@ void Scarf::processEvent(const ObservableButton::Event& event)
             } else {
                 // Original behaviour: same pattern, new randomizer.
                 _lastSelfButtonPressMs = _mesh->timeMs();
-                _patternManager->samePatternDifferentRandomizer(_lastSelfButtonPressMs);
+                _lastPressId      = _mesh->nodeId();
+                _globalRandomizer = (Rnd)random();
+                _patternManager->samePatternDifferentRandomizer(_globalRandomizer);
                 _changeIndex += 1;
                 Scarfnet::log("eLongPress → pattern=%s randomizer=%u ci=%u",
                     _patternManager->getCurrentPattern().c_str(),
-                    (uint16_t)_lastSelfButtonPressMs, _changeIndex);
+                    _globalRandomizer, _changeIndex);
             }
             _taskSendMessage.forceNextIteration();
             break;
@@ -264,19 +299,21 @@ void Scarf::showBuiltInLED()
                     _builtinLED[i] = CRGB::Green;
             }
         } else {
-            // Sync blink: brief red flash on a shared period so all scarves pulse together.
+            // Sync blink: brief flash on a shared period so all scarves pulse together.
+            // Blue = normal; Red = a peer with newer firmware is on the network.
             float    floatTime = _timeMsec / (float)kSyncBlinkPeriodMs;
             uint32_t intTime   = _timeMsec / kSyncBlinkPeriodMs;
             constexpr float kDutyCycle = 0.05f;
             if ((floatTime - (float)intTime) < kDutyCycle)
-                _builtinLED[i] = CRGB::Red;
+                _builtinLED[i] = _newerVersionSeen ? CRGB::Red : CRGB::Blue;
         }
     }
 }
 
 void Scarf::showLEDs()
 {
-    _patternManager->runCurrentPattern(_ledsReal, _mesh->timeMs(), _tapTempo.beatInfo(_timeMsec));
+    _patternManager->runCurrentPattern(_ledsReal, _mesh->timeMs(), _tapTempo.beatInfo(_timeMsec),
+        _mesh->nodeId(), _lastPressId, _nodeFlashes, _nodeFlashCount);
 }
 
 void Scarf::blinkNumNodes()
