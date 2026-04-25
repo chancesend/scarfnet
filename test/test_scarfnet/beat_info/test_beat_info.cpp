@@ -24,7 +24,6 @@ void test_beat_info_inactive_returns_start_for_all_envelopes() {
     TEST_ASSERT_EQUAL_UINT8(0,  b.beatInBar());
     TEST_ASSERT_EQUAL_UINT16(0, b.barNumber());
     TEST_ASSERT_EQUAL_UINT32(0, b.barPhaseMs());
-    TEST_ASSERT_EQUAL_UINT8(0,  b.frac8());
     TEST_ASSERT_FALSE(b.isOnBeat());
     TEST_ASSERT_FALSE(b.isOnBar());
     TEST_ASSERT_FALSE(b.isOnPhrase(16));
@@ -92,7 +91,7 @@ void test_beat_info_not_on_beat_past_window() {
     TEST_ASSERT_FALSE(make(kInterval, 100, 0).isOnBeat(60));
 }
 
-// ─── beatFrac8 ───────────────────────────────────────────────────────────────
+// ─── frac8 ───────────────────────────────────────────────────────────────────
 
 void test_beat_info_frac8_at_onset() {
     TEST_ASSERT_EQUAL_UINT8(0, make(kInterval, 0, 0).frac8());
@@ -108,7 +107,7 @@ void test_beat_info_frac8_near_end() {
     TEST_ASSERT_EQUAL_UINT8(254, make(kInterval, 499, 0).frac8());
 }
 
-// ─── beatSawTime ─────────────────────────────────────────────────────────────
+// ─── sawTime ─────────────────────────────────────────────────────────────────
 
 void test_beat_saw_time_start_at_onset() {
     // start=255, end=0, windowMs=100; at phaseMs=0 → 255
@@ -140,7 +139,7 @@ void test_beat_saw_time_custom_range() {
     TEST_ASSERT_EQUAL_UINT8(200, make(kInterval, 100, 0).sawTime(100, 100, 200));
 }
 
-// ─── beatSaw ─────────────────────────────────────────────────────────────────
+// ─── saw ─────────────────────────────────────────────────────────────────────
 
 void test_beat_saw_start_at_onset() {
     TEST_ASSERT_EQUAL_UINT8(0, make(kInterval, 0, 0).saw());
@@ -178,7 +177,7 @@ void test_beat_saw_phase_wraps() {
     TEST_ASSERT_EQUAL_UINT8(0, make(kInterval, 250, 0).saw(0, 255, 1.0f, 0.5f));
 }
 
-// ─── beatTriangle ────────────────────────────────────────────────────────────
+// ─── triangle ────────────────────────────────────────────────────────────────
 
 void test_beat_triangle_start_at_onset() {
     TEST_ASSERT_EQUAL_UINT8(0, make(kInterval, 0, 0).triangle());
@@ -204,7 +203,7 @@ void test_beat_triangle_phase_shifts_peak() {
     TEST_ASSERT_EQUAL_UINT8(253, make(kInterval, 125, 0).triangle(0, 255, 1.0f, 0.25f));
 }
 
-// ─── beatSin ─────────────────────────────────────────────────────────────────
+// ─── sin ─────────────────────────────────────────────────────────────────────
 
 void test_beat_sin_lo_at_onset() {
     // sin8(0)=128, s=(128-128)*2=0 → lo
@@ -222,7 +221,7 @@ void test_beat_sin_near_lo_at_end() {
     TEST_ASSERT_UINT8_WITHIN(5, 2, make(kInterval, 499, 0).sin());
 }
 
-// ─── beatSquare ──────────────────────────────────────────────────────────────
+// ─── square ──────────────────────────────────────────────────────────────────
 
 void test_beat_square_hi_in_duty_window() {
     // duty=128 (50%); frac=0 → hi
@@ -239,7 +238,7 @@ void test_beat_square_lo_hi_range() {
     TEST_ASSERT_EQUAL_UINT8(50,  make(kInterval, 400, 0).square(128, 50, 200));
 }
 
-// ─── beatExpDecay ────────────────────────────────────────────────────────────
+// ─── expDecay ────────────────────────────────────────────────────────────────
 
 void test_beat_exp_decay_hi_at_onset() {
     // frac=0, remain=255, scale8(255,255)≈255 → hi
@@ -320,21 +319,6 @@ void test_beat_info_bar_phase_ms_mid_bar() {
 void test_beat_info_bar_phase_ms_resets_at_bar_boundary() {
     // beat 4 (bar 1 downbeat), phaseMs=50 → 0*500 + 50 = 50
     TEST_ASSERT_EQUAL_UINT32(50, make(kInterval, 50, 4).barPhaseMs());
-}
-
-// ─── barFrac8 ────────────────────────────────────────────────────────────────
-
-void test_beat_info_bar_frac8_at_downbeat() {
-    TEST_ASSERT_EQUAL_UINT8(0, make(kInterval, 0, 0).frac8());
-}
-
-void test_beat_info_bar_frac8_at_midpoint() {
-    // beat 2 of 4, phaseMs=0 → barPhase=1000, barMs=2000 → 1000*255/2000=127
-    TEST_ASSERT_EQUAL_UINT8(127, make(kInterval, 0, 2).frac8());
-}
-
-void test_beat_info_bar_frac8_resets_each_bar() {
-    TEST_ASSERT_EQUAL_UINT8(0, make(kInterval, 0, 4).frac8());
 }
 
 // ─── isOnPhrase / isLastBeatOfPhrase / phraseFrac8 ───────────────────────────
@@ -506,12 +490,12 @@ void beat_info_tests() {
     RUN_TEST(test_beat_info_not_on_beat_at_window_boundary);
     RUN_TEST(test_beat_info_not_on_beat_past_window);
 
-    // beatFrac8
+    // frac8
     RUN_TEST(test_beat_info_frac8_at_onset);
     RUN_TEST(test_beat_info_frac8_at_midpoint);
     RUN_TEST(test_beat_info_frac8_near_end);
 
-    // beatSawTime
+    // sawTime
     RUN_TEST(test_beat_saw_time_start_at_onset);
     RUN_TEST(test_beat_saw_time_midpoint_decay);
     RUN_TEST(test_beat_saw_time_end_at_boundary);
@@ -519,7 +503,7 @@ void beat_info_tests() {
     RUN_TEST(test_beat_saw_time_attack_direction);
     RUN_TEST(test_beat_saw_time_custom_range);
 
-    // beatSaw
+    // saw
     RUN_TEST(test_beat_saw_start_at_onset);
     RUN_TEST(test_beat_saw_full_beat_midpoint);
     RUN_TEST(test_beat_saw_holds_end_after_duty_window);
@@ -528,24 +512,24 @@ void beat_info_tests() {
     RUN_TEST(test_beat_saw_phase_shifts_onset);
     RUN_TEST(test_beat_saw_phase_wraps);
 
-    // beatTriangle
+    // triangle
     RUN_TEST(test_beat_triangle_start_at_onset);
     RUN_TEST(test_beat_triangle_peaks_at_midbeat);
     RUN_TEST(test_beat_triangle_start_at_end);
     RUN_TEST(test_beat_triangle_half_duty_holds_start_past_window);
     RUN_TEST(test_beat_triangle_phase_shifts_peak);
 
-    // beatSin
+    // sin
     RUN_TEST(test_beat_sin_lo_at_onset);
     RUN_TEST(test_beat_sin_near_peak_at_midbeat);
     RUN_TEST(test_beat_sin_near_lo_at_end);
 
-    // beatSquare
+    // square
     RUN_TEST(test_beat_square_hi_in_duty_window);
     RUN_TEST(test_beat_square_lo_past_duty);
     RUN_TEST(test_beat_square_lo_hi_range);
 
-    // beatExpDecay
+    // expDecay
     RUN_TEST(test_beat_exp_decay_hi_at_onset);
     RUN_TEST(test_beat_exp_decay_below_linear_at_midpoint);
     RUN_TEST(test_beat_exp_decay_near_lo_at_end);
@@ -569,11 +553,6 @@ void beat_info_tests() {
     RUN_TEST(test_beat_info_bar_phase_ms_at_downbeat);
     RUN_TEST(test_beat_info_bar_phase_ms_mid_bar);
     RUN_TEST(test_beat_info_bar_phase_ms_resets_at_bar_boundary);
-
-    // barFrac8
-    RUN_TEST(test_beat_info_bar_frac8_at_downbeat);
-    RUN_TEST(test_beat_info_bar_frac8_at_bar_midpoint);
-    RUN_TEST(test_beat_info_bar_frac8_resets_each_bar);
 
     // isOnPhrase / isLastBeatOfPhrase / phraseFrac8
     RUN_TEST(test_beat_info_is_on_phrase_at_start);

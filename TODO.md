@@ -2,7 +2,6 @@
 
 ## Simplification
 
-- [x] Mesh::TimeMs should be used instead of uint32_t for timestamps
 - [ ] Make `SCARFNET_EMBEDDED` a real PlatformIO build flag instead of hardcoding it in `defines.h`
     - Currently `defines.h` has `#define SCARFNET_EMBEDDED (1)` unconditionally, so any header that includes `defines.h` pulls in FastLED and can't compile natively
     - Fix: remove the hardcode from `defines.h`; add `-D SCARFNET_EMBEDDED=1` to the `build_flags` of the embedded env in `platformio.ini` only (not the native env)
@@ -27,11 +26,6 @@
     - [ ] Can we make all the scarves extensions of the same pattern?
 - [ ] Work on "digital" effect
 
-## Party mode (tap-tempo) ideas
-- [x] For tap-tempo mode, we should take our tempo taps on the press of the button, not the release
-- [x] All modes should have some sort of party mode variant
-
-
 ## Log Visualizations
 
 - [ ] Investigate neighbor routing for certain messages, to reduce traffic and hops
@@ -54,4 +48,8 @@
 - [ ] Investigate running on Zigbee (would require an upgraded ESP32)
 - [ ] What refactorings would make this more extensible and modular?
 - [ ] Figure out if there's a better way to form the network ad-hoc via button presses
-- [x] Is there a way we can visualize the patterns natively? Figure out a way to simulate N scarves, so that we can simulate how different patterns will look in the real scarves
+- [ ] Allow tap-tempo values to have a decimal point and average out a few more values so that we can get better estimates
+- [ ] Only accept tap-tempo values from between 30bpm and 240bpm
+- [ ] Change the heartbeat colors for the different modes
+    - Blue heartbeat for normal operation
+    - Red heartbeat if a scarf detects a newer scarf on the network (via the heartbeat)
