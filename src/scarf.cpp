@@ -108,16 +108,18 @@ void Scarf::onReceived(const HeartbeatPacket& pkt)
 
     this->debugModeUpdate(pkt);
 
-    if (!shouldAcceptUpdate(pkt.changeIndex, _changeIndex))
-        return;
-
     // Sync beat info from any scarf that has an active tap-tempo.
     // Don't overwrite our own if we're the one tapping.
+    // This must happen before the shouldAcceptUpdate guard — beat info flows
+    // independently of pattern changes and must update on every heartbeat.
     if (pkt.beatIntervalMs != 0 && !_tapTempoMode) {
         _tapTempo.setFromPacket(pkt.beatIntervalMs, pkt.currentTimeMs, pkt.beatPhaseMs);
     } else if (pkt.beatIntervalMs == 0 && !_tapTempoMode) {
         _tapTempo.reset();
     }
+
+    if (!shouldAcceptUpdate(pkt.changeIndex, _changeIndex))
+        return;
 
     Scarfnet::log("[SCARF][RCV] accepting pattern=%s randomizer=%u ci=%u from node %u",
                   pkt.pattern, pkt.globalRandomizer, pkt.changeIndex, pkt.id);
