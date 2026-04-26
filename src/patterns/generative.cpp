@@ -46,10 +46,14 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 
     // ── Slow macro vibe signals (shared across all scarves) ───────────────────
     // Cycles are incommensurate so the combined vibe space doesn't repeat within 20 min.
-    // rndA/B/C shift each signal to a different starting region of the noise field.
-    const uint8_t vibeFlow   = inoise8(t / 2500, rndA);          // ~10 min full cycle
-    const uint8_t vibeEnergy = inoise8(t / 1500, 100 + rndB);    //  ~6 min full cycle
-    const uint8_t vibeSplit  = inoise8(t / 3500, 200 + rndC);    // ~14 min full cycle
+    // Larger divisor = slower evolution. rndA/B/C shift each to a different noise region.
+    constexpr uint32_t kVibeFlowPeriodMs   = 2500;  // ~10 min full cycle (sweep ↔ dart)
+    constexpr uint32_t kVibeEnergyPeriodMs = 1500;  //  ~6 min full cycle (calm ↔ energetic)
+    constexpr uint32_t kVibeSplitPeriodMs  = 3500;  // ~14 min full cycle (unified ↔ fragmented)
+
+    const uint8_t vibeFlow   = inoise8(t / kVibeFlowPeriodMs,   rndA);
+    const uint8_t vibeEnergy = inoise8(t / kVibeEnergyPeriodMs, 100 + rndB);
+    const uint8_t vibeSplit  = inoise8(t / kVibeSplitPeriodMs,  200 + rndC);
 
     // ── Layer 1: Organic noise base ───────────────────────────────────────────
     // Hue is driven by a shared coarse signal (no localOffset) so all scarves
@@ -97,7 +101,8 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
             ? beat.saw(255, 0)
             : 0;
 
-        const uint32_t activePeriod = (phraseBurst > 0) ? 300u : period;
+        constexpr uint32_t kBurstPeriodMs = 300;  // streak sweep period during phrase-end burst (ms)
+        const uint32_t activePeriod = (phraseBurst > 0) ? kBurstPeriodMs : period;
 
         // Apply per-device phase offset to streak position
         uint32_t tOff = (t + (uint32_t)localPhase * (activePeriod >> 8)) % activePeriod;
@@ -131,8 +136,9 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
     //   half-beat  (÷2) — snaps on every half-beat, tight rhythmic chop
     //   quarter-beat (÷4) — used when vibeFlow is high (fast/digital character)
     // When no beat, an autonomous period (380–560 ms from localRnd) is used.
-    if (vibeSplit > 110) {
-        const uint8_t excess  = vibeSplit - 110;                              // 0–145
+    constexpr uint8_t kSplitThreshold = 110;  // vibeSplit value above which fragmentation begins [0–255]
+    if (vibeSplit > kSplitThreshold) {
+        const uint8_t excess  = vibeSplit - kSplitThreshold;                              // 0–145
         const uint8_t fragAmt = (excess > 127) ? 255 : (uint8_t)(excess * 2); // 0→255 as vibeSplit→237
 
         uint16_t snapPeriod;
@@ -160,7 +166,8 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
     // sparse at the tail — like sparks thrown by an impact. Each frame during
     // the ~100 ms window fires a different random subset, giving an organic burst.
     if (beat.isActive()) {
-        uint8_t flash = beat.sawTime(100);
+        constexpr uint16_t kBeatFlashMs = 100;  // beat flash decay window (ms); shorter = snappier
+        uint8_t flash = beat.sawTime(kBeatFlashMs);
         if (flash > 0) {
             uint8_t flashHue = (uint8_t)(rnd * 17u >> 8);
             for (int i = 0; i < kNumLeds; ++i) {

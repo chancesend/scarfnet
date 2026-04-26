@@ -13,14 +13,34 @@ void colorwaves(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const 
         return lo + (uint16_t)((uint32_t)(hi - lo) * (uint16_t)((int32_t)sin16(phase) + 32768) / 65536);
     };
 
-    uint8_t  brightdepth        = (uint8_t)beatsinT(341, 96, 224);
-    uint16_t brightnessthetainc = beatsinT(203, 25 * 256, 40 * 256);
-    uint16_t hueinc16           = beatsinT(113, 300, 1500);
+    // Oscillator rates (8.8 fixed-point BPM: divide by 256 for actual BPM).
+    // Incommensurate values keep the pattern from repeating on short cycles.
+    constexpr uint16_t kBrightDepthBpm88  = 341;   // ~1.33 BPM brightness depth oscillation
+    constexpr uint16_t kBrightThetaBpm88  = 203;   // ~0.79 BPM brightness wave spacing
+    constexpr uint16_t kHueIncBpm88       = 113;   // ~0.44 BPM hue scroll speed oscillation
+
+    // Brightness depth range [96, 224]: higher min = less contrast; higher max = deeper pulses
+    constexpr uint8_t  kBrightDepthMin    = 96;
+    constexpr uint8_t  kBrightDepthMax    = 224;
+    // Brightness wave spacing range (in 8.8 units): controls LED-to-LED phase offset
+    constexpr uint16_t kBrightThetaMin    = 25 * 256;
+    constexpr uint16_t kBrightThetaMax    = 40 * 256;
+    // Hue scroll increment range [300, 1500]: wider range = more dramatic hue sweep
+    constexpr uint16_t kHueIncMin         = 300;
+    constexpr uint16_t kHueIncMax         = 1500;
+    // How many times faster hue scrolls on the last beat of a phrase
+    constexpr uint8_t  kPhraseHueMult     = 5;
+    // How quickly new colors blend in each frame [0=no update, 255=instant]
+    constexpr uint8_t  kBlendAmount       = 128;
+
+    uint8_t  brightdepth        = (uint8_t)beatsinT(kBrightDepthBpm88, kBrightDepthMin, kBrightDepthMax);
+    uint16_t brightnessthetainc = beatsinT(kBrightThetaBpm88, kBrightThetaMin, kBrightThetaMax);
+    uint16_t hueinc16           = beatsinT(kHueIncBpm88, kHueIncMin, kHueIncMax);
 
     // On the last beat of every 16-beat phrase, run the hue 5× faster to build
     // tension before the phrase boundary.
     if (beat.isActive() && beat.isLastBeatOfPhrase(16))
-        hueinc16 *= 5;
+        hueinc16 *= kPhraseHueMult;
 
     // Pseudotime: time-integral of msmultiplier (beatsin88(147, 23, 60), avg ≈ 41/ms).
     // When beat is active, compute the exact integral: 15 beats at 1× rate then 1 beat
@@ -61,7 +81,7 @@ void colorwaves(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const 
         CRGB newcolor = ColorFromPalette(palette, index, bri8);
 
         uint16_t pixelnumber = (leds.size() - 1) - i;
-        nblend(leds[pixelnumber], newcolor, 128);
+        nblend(leds[pixelnumber], newcolor, kBlendAmount);
     }
 }
 

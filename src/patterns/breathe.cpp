@@ -14,8 +14,11 @@ void breathe(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 {
     // Map time into a 16-bit angle for sin16 (full cycle = 65536)
     uint16_t angle = (uint16_t)((uint32_t)(timeMs % periodMs) * 65536UL / (uint32_t)periodMs);
-    // sin16 → [−32767, 32767] → remap to brightness [30, 220]
-    uint8_t brightness = lerp8by8(30, 220, (uint8_t)((sin16(angle) + 32767) >> 8));
+    constexpr uint8_t kMinBrightness  = 30;   // dim end of breath (inhale)
+    constexpr uint8_t kMaxBrightness  = 220;  // bright end of breath (exhale)
+
+    // sin16 → [−32767, 32767] → remap to brightness range
+    uint8_t brightness = lerp8by8(kMinBrightness, kMaxBrightness, (uint8_t)((sin16(angle) + 32767) >> 8));
 
     // Slowly drift hue through the palette (hoisted so beat block can reference it)
     const uint8_t hue = (uint8_t)((uint32_t)timeMs / hueSpeed);
@@ -24,13 +27,14 @@ void breathe(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
     for (auto& led : leds) led = color;
 
     // Beat: a sharp "gasp" — a contrasting palette color that snaps brighter than
-    // the natural sine peak, then vanishes quickly. Wider window (150 ms) and full
+    // the natural sine peak, then vanishes quickly. Wider window and full
     // blend amount make it feel like a caught breath against the slow rhythm.
     if (beat.isActive()) {
-        uint8_t flash = beat.sawTime(150);
+        constexpr uint16_t kBeatFlashMs    = 150;  // decay window for beat gasp (ms); shorter = snappier
+        constexpr uint8_t  kFlashHueOffset = 96;   // palette offset for the flash vs breath color (~quarter turn)
+        uint8_t flash = beat.sawTime(kBeatFlashMs);
         if (flash > 0) {
-            // Quarter-turn hue offset from the current breath color + rnd tint
-            uint8_t flashHue = hue + 96 + (uint8_t)(rnd * 23u >> 8);
+            uint8_t flashHue = hue + kFlashHueOffset + (uint8_t)(rnd * 23u >> 8);
             CRGB flashColor = ColorFromPalette(palette, flashHue, 255, LINEARBLEND);
             for (auto& led : leds) led = blend(led, flashColor, flash);
         }

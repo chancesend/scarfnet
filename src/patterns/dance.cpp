@@ -67,9 +67,10 @@ void dance(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
             uint32_t tOff = ((uint32_t)timeMs + (uint32_t)s * period / sweepCount) % period;
             uint8_t  frac = (uint8_t)(tOff * 255 / period);
             uint8_t  pos  = (uint8_t)((uint16_t)quadwave8(frac) * kNumLeds >> 8);
+            constexpr uint8_t kCylonBrightness = 220;  // peak brightness of the cylon beam
             uint8_t  cylHue = hue + (uint8_t)(s * 128);
-            CRGB cylColor = ColorFromPalette(palette, cylHue, 220, LINEARBLEND);
-            uint8_t maxAmt = wildWindow ? 220 : lerp8by8(50, 10, flash);
+            CRGB cylColor = ColorFromPalette(palette, cylHue, kCylonBrightness, LINEARBLEND);
+            uint8_t maxAmt = wildWindow ? kCylonBrightness : lerp8by8(50, 10, flash);
 
             for (int i = 0; i < kNumLeds; ++i) {
                 uint8_t dist = (uint8_t)abs(i - (int)pos);
@@ -83,7 +84,8 @@ void dance(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 
     // ── Layer 3: Phrase events (tap-tempo only) ───────────────────────────────
     if (beat.isActive()) {
-        const bool onBeatOnset = active.phaseMs < 80;
+        constexpr uint16_t kBeatOnsetWindowMs = 80;  // ms at the top of each beat considered "on onset"
+        const bool onBeatOnset = active.phaseMs < kBeatOnsetWindowMs;
 
         if (wildWindow) {
             if (onBeatOnset) {

@@ -22,7 +22,9 @@ void firework(Leds& leds, int32_t timeMs, int periodMs, const CRGBPalette16& pal
     leds[fireworkLerpVal] = ColorFromPalette(palette, index, 255, LINEARBLEND);
     leds[fireworkLerpVal].maximizeBrightness();
 
-    fadeToBlackBy(leds.data(), leds.size(), 16);
+    constexpr uint8_t kFadeAmount = 16;  // higher = shorter trails
+
+    fadeToBlackBy(leds.data(), leds.size(), kFadeAmount);
 }
 
 } // namespace Scarfnet

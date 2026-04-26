@@ -72,8 +72,10 @@ void digital(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         if (litAge[i] == 0) { leds[i] = CRGB::Black; continue; }
 
         // ageRatio: 255=newest/brightest, low=oldest/dimmest
+        constexpr uint8_t kMinBrightness = 80;   // oldest pixels (about to expire)
+        constexpr uint8_t kMaxBrightness = 200;  // freshly lit pixels
         uint8_t ageRatio = (uint8_t)((uint16_t)litAge[i] * 255u / holdBeats);
-        uint8_t bright   = lerp8by8(80, 200, ageRatio);
+        uint8_t bright   = lerp8by8(kMinBrightness, kMaxBrightness, ageRatio);
 
         // Per-LED stable hue from localRnd so each scarf has its own color layout
         uint8_t hue = baseHue + (uint8_t)((uint32_t)i * 13u + (uint8_t)(local >> 8));

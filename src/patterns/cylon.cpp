@@ -12,13 +12,16 @@ void cylon(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
            uint8_t baseHue, uint8_t secondaryHue, int width, int basePeriodMs)
 {
     // Period drifts ±1.5% over ~90 s — barely perceptible, just enough to feel alive
-    uint16_t periodOscAngle = (uint16_t)((uint32_t)timeMs * 65536u / 90000u);
+    constexpr uint32_t kPeriodOscCycleMs = 90000;  // period of the period-drift oscillation
+    constexpr uint32_t kHueOscCycleMs    = 20000;  // period of the hue oscillation (~20 s)
+    constexpr int8_t   kHueOscAmp        = 12;     // ±hue units around baseHue
+
+    uint16_t periodOscAngle = (uint16_t)((uint32_t)timeMs * 65536u / kPeriodOscCycleMs);
     int32_t  periodOsc      = ((int32_t)sin16(periodOscAngle) * (basePeriodMs >> 6)) >> 15;
     int      period         = max(200, basePeriodMs + (int)periodOsc);
 
-    // Hue oscillates ±12 units around baseHue over ~20 s
-    uint16_t hueOscAngle = (uint16_t)((uint32_t)timeMs * 65536u / 20000u);
-    int8_t   hueOsc      = (int8_t)((int32_t)sin16(hueOscAngle) * 12 >> 15);
+    uint16_t hueOscAngle = (uint16_t)((uint32_t)timeMs * 65536u / kHueOscCycleMs);
+    int8_t   hueOsc      = (int8_t)((int32_t)sin16(hueOscAngle) * kHueOscAmp >> 15);
     uint8_t  hue         = baseHue + (uint8_t)hueOsc;
 
     // Smooth bounce via quadwave8
@@ -37,7 +40,8 @@ void cylon(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         CRGB mainColor = ColorFromPalette(palette, hue, fade, LINEARBLEND);
 
         // Secondary palette color subtly reflected at the center of the bar
-        uint8_t secAmt = (uint8_t)((uint16_t)(255 - t) * 40u >> 8);  // max ~40 at center
+        constexpr uint8_t kSecColorMaxAmt = 40;  // max secondary color at beam center (0=off, 255=full)
+        uint8_t secAmt = (uint8_t)((uint16_t)(255 - t) * kSecColorMaxAmt >> 8);
         CRGB secColor  = ColorFromPalette(palette, secondaryHue, 255, LINEARBLEND);
 
         leds[i] = blend(mainColor, secColor, secAmt);

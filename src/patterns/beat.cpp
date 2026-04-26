@@ -31,10 +31,28 @@ namespace Scarfnet {
 void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
           const BeatInfo& b, Rnd rnd, Rnd localRnd)
 {
+    // ── Fallback (no tap-tempo) ──────────────────────────────────────────────
+    constexpr uint32_t kFallbackPeriodMs  = 4000;   // breathing period when no beat
+    constexpr uint8_t  kFallbackBriMin    = 20;     // dim end of idle breathe
+    constexpr uint8_t  kFallbackBriMax    = 100;    // bright end of idle breathe
+
+    // ── Beat-synced constants ────────────────────────────────────────────────
+    constexpr uint8_t  kBaseFade          = 70;     // per-frame decay; higher = punchier gaps
+    constexpr uint16_t kBeatWindowMs      = 80;     // onset window for beat-triggered events (ms)
+    constexpr uint8_t  kHueStepPerBar     = 40;     // palette rotation at each 4-beat bar
+    constexpr uint8_t  kBeamHueOffset     = 64;     // palette offset for the sweep beam vs base hue
+    constexpr uint8_t  kSparkCount        = 8;      // LEDs lit per beat spark scatter
+    constexpr uint8_t  kSparkHueOffset    = 128;    // complementary hue for sparks
+    constexpr uint8_t  kBarMarkerBlend    = 220;    // how strongly the white bar-marker overwrites
+    constexpr uint16_t k2BarSawMs         = 300;    // decay window for 2-bar accent event
+    constexpr uint16_t k4BarSawMs         = 500;    // decay window for 4-bar inward sweep
+    constexpr uint16_t k8BarSawMs         = 400;    // decay window for 8-bar white strobe
+    constexpr uint16_t k16BarSawMs        = 600;    // decay window for 16-bar full burst
+
     if (!b.isActive()) {
         // Minimal fallback — this pattern is designed for tap-tempo
-        uint16_t angle = (uint16_t)((uint32_t)(timeMs % 4000) * 65536UL / 4000UL);
-        uint8_t bright = lerp8by8(20, 100, (uint8_t)((sin16(angle) + 32767) >> 8));
+        uint16_t angle = (uint16_t)((uint32_t)(timeMs % kFallbackPeriodMs) * 65536UL / kFallbackPeriodMs);
+        uint8_t bright = lerp8by8(kFallbackBriMin, kFallbackBriMax, (uint8_t)((sin16(angle) + 32767) >> 8));
         uint8_t hue = (uint8_t)(timeMs >> 8);
         for (auto& led : leds)
             led = ColorFromPalette(palette, hue, bright, LINEARBLEND);
@@ -42,8 +60,8 @@ void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
     }
 
     const uint32_t beatNum = b.beatNumber;
-    // Hue drifts slowly and steps 40 units at each bar boundary for structure
-    const uint8_t hue = (uint8_t)(timeMs >> 8) + (uint8_t)(b.barNumber(4) * 40);
+    // Hue drifts slowly and steps at each bar boundary for structure
+    const uint8_t hue = (uint8_t)(timeMs >> 8) + (uint8_t)(b.barNumber(4) * kHueStepPerBar);
 
     // ── Session-fixed event thresholds (0–255) ───────────────────────────────
     // Different bits of rnd drive each threshold independently.
@@ -59,11 +77,11 @@ void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 
     // ── Base decay ──────────────────────────────────────────────────────────
     // Aggressive decay keeps inter-beat space dark for a punchy strobe feel
-    fadeToBlackBy(leds.data(), kNumLeds, 70);
+    fadeToBlackBy(leds.data(), kNumLeds, kBaseFade);
 
     // ── A. Beat brightness pulse (always) ───────────────────────────────────
     {
-        uint8_t flash = b.sawTime(80);
+        uint8_t flash = b.sawTime(kBeatWindowMs);
         if (flash > 0) {
             CRGB c = ColorFromPalette(palette, hue, flash, LINEARBLEND);
             for (auto& led : leds) led = blend(led, c, flash >> 2);
@@ -79,7 +97,7 @@ void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         int beamPos = (int)(((uint16_t)frac + (uint8_t)(localRnd >> 8)) * kNumLeds >> 8) % kNumLeds;
 
         uint8_t beamBright = b.sawTime(b.intervalMs);  // full-beat trail
-        CRGB beamColor = ColorFromPalette(palette, hue + 64, beamBright, LINEARBLEND);
+        CRGB beamColor = ColorFromPalette(palette, hue + kBeamHueOffset, beamBright, LINEARBLEND);
         constexpr int kBeamWidth = 3;
         for (int i = 0; i < kNumLeds; ++i) {
             int d = abs(i - beamPos);
@@ -90,7 +108,7 @@ void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         }
     }
 
-    const bool onBeat = b.isOnBeat(80);
+    const bool onBeat = b.isOnBeat(kBeatWindowMs);
 
     // ── B. Beat strobe flash ─────────────────────────────────────────────────
     if (onBeat && strobeRoll < strobeThresh) {
@@ -101,8 +119,8 @@ void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 
     // ── C. Beat spark scatter ────────────────────────────────────────────────
     if (onBeat && sparkRoll < sparkThresh) {
-        uint8_t sparkHue = hue + 128;
-        for (int i = 0; i < 8; ++i) {
+        uint8_t sparkHue = hue + kSparkHueOffset;
+        for (int i = 0; i < kSparkCount; ++i) {
             // localRnd staggers spark positions across devices
             int pos = (int)((uint32_t)(localRnd + beatNum * (uint32_t)(i * 47u + 13u)) % kNumLeds);
             leds[pos] = ColorFromPalette(palette, sparkHue + (uint8_t)(i * 16), 255, LINEARBLEND);
@@ -110,7 +128,7 @@ void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
     }
 
     // ── E. Bar color wipe ────────────────────────────────────────────────────
-    if (b.isOnBar(4, 80) && barHash < barWipeThresh) {
+    if (b.isOnBar(4, kBeatWindowMs) && barHash < barWipeThresh) {
         uint8_t wipeHue = hue + (uint8_t)(b.barNumber(4) * 64);
         uint8_t f = b.sawTime(250);
         CRGB c = ColorFromPalette(palette, wipeHue, f, LINEARBLEND);
@@ -119,14 +137,14 @@ void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 
     // ── F. Bar position marker (always) ─────────────────────────────────────
     // A single white pip gives the listener a subtle structural anchor.
-    if (b.isOnBar(4, 80)) {
+    if (b.isOnBar(4, kBeatWindowMs)) {
         int markerPos = (int)((uint32_t)b.barNumber(4) * 7u % kNumLeds);
-        leds[markerPos] = blend(leds[markerPos], CRGB::White, 220);
+        leds[markerPos] = blend(leds[markerPos], CRGB::White, kBarMarkerBlend);
     }
 
     // ── G. 2-bar accent (conditional on p2Thresh) ───────────────────────────
     {
-        uint8_t f = b.phraseView(8).sawTime(300);
+        uint8_t f = b.phraseView(8).sawTime(k2BarSawMs);
         if (f > 0 && barHash < p2Thresh) {
             CRGB c = ColorFromPalette(palette, hue + 96, f, LINEARBLEND);
             for (int i = 0; i < kNumLeds; i += 2)
@@ -136,7 +154,7 @@ void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 
     // ── H. 4-bar inward sweep (always) ──────────────────────────────────────
     {
-        uint8_t f = b.phraseView(16).sawTime(500);
+        uint8_t f = b.phraseView(16).sawTime(k4BarSawMs);
         if (f > 0) {
             uint8_t phraseHue = hue + (uint8_t)(beatNum * 7u);
             for (int i = 0; i < kNumLeds / 2; ++i) {
@@ -150,14 +168,14 @@ void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 
     // ── I. 8-bar white strobe (always) ──────────────────────────────────────
     {
-        uint8_t f = b.phraseView(32).sawTime(400);
+        uint8_t f = b.phraseView(32).sawTime(k8BarSawMs);
         if (f > 0)
             for (auto& led : leds) led = blend(led, CRGB::White, f >> 1);
     }
 
     // ── J. 16-bar full burst (always) ───────────────────────────────────────
     {
-        uint8_t f = b.phraseView(64).sawTime(600);
+        uint8_t f = b.phraseView(64).sawTime(k16BarSawMs);
         if (f > 0)
             for (auto& led : leds) led = blend(led, CRGB::White, f);
     }

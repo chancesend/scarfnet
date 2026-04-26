@@ -13,16 +13,49 @@ void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatI
         return lo + (uint16_t)((uint32_t)(hi - lo) * (uint16_t)((int32_t)sin16(phase) + 32768) / 65536);
     };
 
-    uint8_t  brightdepth        = (uint8_t)beatsinT(341, 96, 224);
-    uint16_t brightnessthetainc = beatsinT(203, 25 * 256, 40 * 256);
-    uint16_t hueinc16           = beatsinT(113, 1, 3000);
+    // Oscillator rates (8.8 fixed-point BPM: divide by 256 for actual BPM).
+    constexpr uint16_t kBrightDepthBpm88  = 341;   // ~1.33 BPM brightness depth oscillation
+    constexpr uint16_t kBrightThetaBpm88  = 203;   // ~0.79 BPM brightness wave spacing
+    constexpr uint16_t kHueIncBpm88       = 113;   // ~0.44 BPM hue scroll speed oscillation
+
+    // Brightness depth range [96, 224]: higher min = less contrast; higher max = deeper pulses
+    constexpr uint8_t  kBrightDepthMin    = 96;
+    constexpr uint8_t  kBrightDepthMax    = 224;
+    // Brightness wave spacing range (in 8.8 units)
+    constexpr uint16_t kBrightThetaMin    = 25 * 256;
+    constexpr uint16_t kBrightThetaMax    = 40 * 256;
+    // Hue scroll increment range: [1, 3000] → very wide sweep for rainbow-y feel
+    constexpr uint16_t kHueIncMin         = 1;
+    constexpr uint16_t kHueIncMax         = 3000;
+    // How quickly new colors blend in each frame [0=no update, 255=instant]
+    constexpr uint8_t  kBlendAmount       = 64;
+
+    uint8_t  brightdepth        = (uint8_t)beatsinT(kBrightDepthBpm88, kBrightDepthMin, kBrightDepthMax);
+    uint16_t brightnessthetainc = beatsinT(kBrightThetaBpm88, kBrightThetaMin, kBrightThetaMax);
+    uint16_t hueinc16           = beatsinT(kHueIncBpm88, kHueIncMin, kHueIncMax);
+
+    // Per-device variation from localRnd — subtle enough to read as a cloud, not independent.
+    // localPhase:   fixed offset into the brightness wave so peaks land at different positions.
+    // localHueBias: small palette shift [0..~20 hue8 steps] for color tinting.
+    // localRate:    per-device pseudotime advance speed slightly above/below the fleet average,
+    //               so brightness peaks drift apart over minutes without ever looking detached.
+    const uint8_t localPhase   = (uint8_t)localRnd;
+    const uint8_t localHueBias = (uint8_t)(localRnd >> 8);
+    constexpr uint8_t  kPseudoRateBase    = 38;   // min per-device pseudotime advance rate (ms⁻¹)
+    constexpr uint8_t  kPseudoRateSpread  = 7;    // range above base (38–44 vs fleet average 41)
+    constexpr uint8_t  kHueBiasScale      = 20;   // hue8 units of per-device palette offset [0..20]
 
     // Pseudotime: time-integral of msmultiplier (beatsin88(147, 23, 60), avg ≈ 41/ms).
-    // Linear approximation at the average rate — wraps naturally as uint16_t.
-    uint16_t pseudotime = (uint16_t)((uint32_t)timeMs * 41u);
+    // Each device advances at its own rate (kPseudoRateBase..kPseudoRateBase+kPseudoRateSpread)
+    // plus a fixed phase offset — brightness peaks start displaced and drift apart over time.
+    const uint8_t localPseudoRate = kPseudoRateBase + (uint8_t)(localPhase % kPseudoRateSpread);
+    uint16_t pseudotime = (uint16_t)((uint32_t)timeMs * localPseudoRate)
+                        + (uint16_t)((uint32_t)localPhase << 8);  // fixed phase displacement
 
     // sHue16: time-integral of hue scroll rate (beatsin88(400, 5, 9), avg ≈ 7/ms).
-    uint16_t hue16 = (uint16_t)((uint32_t)timeMs * 7u);
+    // Per-device hue bias shifts each scarf into a slightly different palette neighborhood.
+    uint16_t hue16 = (uint16_t)((uint32_t)timeMs * 7u)
+                   + (uint16_t)((uint32_t)localHueBias * kHueBiasScale);
 
     // ── Phrase events ────────────────────────────────────────────────────────
     // At phrase boundaries there's a session-fixed random chance of a
@@ -83,7 +116,7 @@ void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatI
         bri8 += (255 - brightdepth);
 
         CRGB newcolor = ColorFromPalette(palette, hue8, bri8, LINEARBLEND);
-        nblend(leds[(kNumLeds - 1) - i], newcolor, 64);
+        nblend(leds[(kNumLeds - 1) - i], newcolor, kBlendAmount);
     }
 
     // On-beat palette-color flash on ~50% of pixels.

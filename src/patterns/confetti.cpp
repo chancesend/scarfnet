@@ -8,8 +8,10 @@ void confetti(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t 
     constexpr uint8_t thisbri  = 200;
     constexpr int     huediff  = 100;
 
+    constexpr int kHueDriftDivisorMs = 60;  // larger = slower hue drift (~4 min full cycle at 60)
+
     // Slowly drifting base hue, derived from timeMs — stateless and cross-scarf locked.
-    int thishue = (int)(uint8_t)(timeMs / 60);
+    int thishue = (int)(uint8_t)(timeMs / kHueDriftDivisorMs);
 
     fadeToBlackBy(leds.data(), kNumLeds, fade);
     int popChance = (int)popChancePct;

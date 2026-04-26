@@ -36,8 +36,9 @@ void debug(Leds& leds, const PatternContext& ctx)
     }
 
     // Sparkle white if this scarf last changed the pattern.
+    constexpr uint8_t kSparkleRate = 25;  // out of 255; higher = more frequent white sparkles
     if (ctx.nodeId != 0 && ctx.lastPressId == ctx.nodeId) {
-        if (random8() < 25)
+        if (random8() < kSparkleRate)
             leds[random16() % leds.size()] = CRGB(CRGB::White).nscale8(kFlashBrightness8);
     }
 }
