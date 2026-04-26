@@ -11,10 +11,6 @@ PatternList getPatternList()
     Scarfnet::log("getPatternList()");
     PatternList patterns;
 
-    patterns.push_back({"debug", [](Leds& leds, const PatternContext& ctx) {
-        debug(leds, ctx);
-    }});
-
     patterns.push_back({"pride", [](Leds& leds, const PatternContext& ctx) {
         pride(leds, ctx.timeMs, ctx.palette, ctx.beat);
     }});
@@ -105,6 +101,10 @@ PatternList getPatternList()
 
     patterns.push_back({"digital", [](Leds& leds, const PatternContext& ctx) {
         digital(leds, ctx.timeMs, ctx.palette, ctx);
+    }});
+
+    patterns.push_back({"debug", [](Leds& leds, const PatternContext& ctx) {
+        debug(leds, ctx);
     }});
 
     std::string line = "Pattern list (" + std::to_string(patterns.size()) + " patterns): ";
