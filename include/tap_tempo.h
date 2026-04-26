@@ -35,19 +35,33 @@ struct TapTempo {
             float sample = (float)(now - _lastTapMs);
             float bpm    = 60000.0f / sample;
             if (bpm >= kTapMinBpm && bpm <= kTapMaxBpm) {
-                _intervalMs = (_tapCount == 0)
-                    ? sample
-                    : (_intervalMs * (kSmoothing - 1) + sample) / kSmoothing;
-                _tapCount++;
-                _active     = (_tapCount >= 1);  // active after 2nd tap
+                // Simple moving average over the last kSmoothing intervals.
+                _samples[_sampleHead] = sample;
+                _sampleHead = (_sampleHead + 1) % kSmoothing;
+                if (_sampleCount < kSmoothing) _sampleCount++;
+
+                float sum = 0.0f;
+                for (int i = 0; i < _sampleCount; i++) sum += _samples[i];
+                _intervalMs = sum / (float)_sampleCount;
+
+                _active     = true;
                 _lastBeatMs = now;
             }
             // Out-of-range taps are silently ignored; _lastTapMs still advances
+        } else if (_active) {
+            // Gap too long but tempo is established — re-anchor the beat phase
+            // to now so beat/bar numbers restart from this point. The interval
+            // is preserved; clear the sample buffer so subsequent taps build a
+            // fresh average rather than blending with stale inter-tap gaps.
+            _lastBeatMs  = now;
+            _sampleCount = 0;
+            _sampleHead  = 0;
         } else {
-            // First tap or gap too long — start fresh.
-            _intervalMs = 0.0f;
-            _tapCount   = 0;
-            _active     = false;
+            // No established tempo yet — start fresh.
+            _intervalMs  = 0.0f;
+            _sampleCount = 0;
+            _sampleHead  = 0;
+            _active      = false;
         }
         _hasTapped = true;
         _lastTapMs = now;
@@ -61,16 +75,18 @@ struct TapTempo {
         _intervalMs  = intervalMs;
         _lastBeatMs  = pktCurrentTimeMs - pktBeatPhaseMs;
         _active      = true;
-        _tapCount    = kSmoothing;  // mark as fully established
+        _sampleCount = 0;  // no local tap history; interval comes from the wire
+        _sampleHead  = 0;
     }
 
     void reset() {
-        _active     = false;
-        _hasTapped  = false;
-        _lastTapMs  = 0;
-        _lastBeatMs = 0;
-        _intervalMs = 0;
-        _tapCount   = 0;
+        _active      = false;
+        _hasTapped   = false;
+        _lastTapMs   = 0;
+        _lastBeatMs  = 0;
+        _intervalMs  = 0.0f;
+        _sampleCount = 0;
+        _sampleHead  = 0;
     }
 
     bool     isActive()       const { return _active; }
@@ -97,12 +113,14 @@ struct TapTempo {
     }
 
 private:
-    bool   _active     = false;
-    bool   _hasTapped  = false;  // true after the first tap; guards against t=0 false-positive
-    TimeMs _lastTapMs  = 0;      // mesh time of the most recent tap
-    TimeMs _lastBeatMs = 0;      // mesh time of the most recent beat (= lastTapMs on this scarf)
-    float  _intervalMs = 0.0f;   // smoothed beat interval (float for EMA precision)
-    int    _tapCount   = 0;      // number of valid inter-tap gaps measured so far
+    bool   _active      = false;
+    bool   _hasTapped   = false;       // true after the first tap; guards against t=0 false-positive
+    TimeMs _lastTapMs   = 0;           // mesh time of the most recent tap
+    TimeMs _lastBeatMs  = 0;           // mesh time of the most recent beat
+    float  _intervalMs  = 0.0f;        // current beat interval (ms), averaged from _samples
+    float  _samples[kSmoothing] = {};  // circular buffer of recent inter-tap intervals
+    int    _sampleHead  = 0;           // next write index in _samples
+    int    _sampleCount = 0;           // number of valid samples (0..kSmoothing)
 };
 
 } // namespace Scarfnet

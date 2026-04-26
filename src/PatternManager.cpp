@@ -46,9 +46,12 @@ void PatternManager::initPatterns()
 
 void PatternManager::incrementPattern(Rnd randomizer)
 {
-    auto newPattern = _currentPattern + 1;
-    if (newPattern == _patterns.end())
-        newPattern = _patterns.begin();
+    // Pick a random pattern, excluding the current one.
+    size_t n    = _patterns.size();
+    size_t cur  = (size_t)(_currentPattern - _patterns.begin());
+    size_t idx  = (size_t)(randomizer % (n - 1));
+    if (idx >= cur) idx++;  // skip over current slot
+    auto newPattern = _patterns.begin() + (ptrdiff_t)idx;
     Scarfnet::log("Scarf::incrementPattern(). Changing pattern to %s", newPattern->first.c_str());
     changePatternFromString(newPattern->first, randomizer);
 }

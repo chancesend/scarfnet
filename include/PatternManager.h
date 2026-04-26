@@ -33,7 +33,7 @@ public:
     void runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const BeatInfo& beat,
                             const NodeInfo& nodeInfo);
 
-    // Advances to the next pattern and updates the randomizer seed from the press timestamp.
+    // Switches to a random pattern (excluding current) and updates the randomizer seed.
     void incrementPattern(Rnd randomizer);
     // Keeps the current pattern but re-seeds the randomizer for a different look.
     void samePatternDifferentRandomizer(Rnd randomizer);

@@ -35,16 +35,29 @@ void test_tap_tempo_two_taps_interval_correct() {
     TEST_ASSERT_EQUAL_UINT16(500, tt.beatIntervalMs());
 }
 
-// ─── Gap reset ───────────────────────────────────────────────────────────────
+// ─── Gap reset / re-anchor ───────────────────────────────────────────────────
 
-void test_tap_tempo_large_gap_resets() {
+void test_tap_tempo_large_gap_no_tempo_resets() {
+    // No established tempo: large gap on second tap → stays inactive.
+    TapTempo tt;
+    tt.tap(0);
+    tt.tap(TapTempo::kMaxGapMs + 1);  // gap too large, no tempo yet
+    TEST_ASSERT_FALSE(tt.isActive());
+    TEST_ASSERT_EQUAL_UINT16(0, tt.beatIntervalMs());
+}
+
+void test_tap_tempo_large_gap_reanchors_if_active() {
+    // Established tempo: large gap re-anchors the phase but stays active.
     TapTempo tt;
     tt.tap(0);
     tt.tap(500);  // active, interval=500
     TEST_ASSERT_TRUE(tt.isActive());
-    tt.tap(500 + TapTempo::kMaxGapMs + 1);  // gap too large
-    TEST_ASSERT_FALSE(tt.isActive());
-    TEST_ASSERT_EQUAL_UINT16(0, tt.beatIntervalMs());
+    TimeMs reanchorNow = 500 + TapTempo::kMaxGapMs + 1;
+    tt.tap(reanchorNow);
+    TEST_ASSERT_TRUE(tt.isActive());
+    TEST_ASSERT_EQUAL_UINT16(500, tt.beatIntervalMs());
+    // Phase should be 0 immediately after the re-anchor tap.
+    TEST_ASSERT_EQUAL_UINT16(0, tt.beatPhaseMs(reanchorNow));
 }
 
 void test_tap_tempo_tap_exactly_at_max_gap_resets() {
@@ -192,7 +205,8 @@ void tap_tempo_tests() {
     RUN_TEST(test_tap_tempo_single_tap_not_active);
     RUN_TEST(test_tap_tempo_two_taps_becomes_active);
     RUN_TEST(test_tap_tempo_two_taps_interval_correct);
-    RUN_TEST(test_tap_tempo_large_gap_resets);
+    RUN_TEST(test_tap_tempo_large_gap_no_tempo_resets);
+    RUN_TEST(test_tap_tempo_large_gap_reanchors_if_active);
     RUN_TEST(test_tap_tempo_tap_exactly_at_max_gap_resets);
     RUN_TEST(test_tap_tempo_tap_just_under_max_gap_keeps_active);
     RUN_TEST(test_tap_tempo_rejects_too_slow_tap);
