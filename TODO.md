@@ -1,22 +1,15 @@
 # TODO
 
-
 ## Pattern enhancements
 - [ ] Add a couple of modes that attempt to do "swarming" logic by taking into account time-of-arrival delays between scarves, so that the LED patterns are not all the same (they are either offset in time, or do slightly different patterns for interesting visual effects)
     - [ ] Add very slight delay of secondary nodes when playing received pattern?
     - [ ] Can we make all the scarves extensions of the same pattern?
-- [ ] Work on "digital" effect
-- [ ] Debug mode, to add a visual notification for each heartbeat that arrives at the scarf, to help debug the mesh
+- [ ] Work on "digital" effect - 1-4    
+    LEDs are added and removed on the beat. Then at the end of every     
+    16/32/64 beat pattern, the colors and speed goes a little wild       
+    (with a bit of randomness thrown in)
 - [ ] Overall LED brightness effected by flashes due to current limiting - can this be fixed? Might need a capacitor
-- [ ] Fix up the simulator, make sure it doesn't break again (via unit test)
-
-
-## ESP-NOW Port (see docs/plan-espnow-port.md)
-- [ ] **Phase 5 — Full fleet range test**
-    - [ ] Deploy all 16 scarves in a festival-like space
-    - [ ] Walk scarves apart to find range limit
-    - [ ] Confirm all nodes receive broadcasts from all others
-    - [ ] Evaluate whether flooding (TTL re-broadcast) is needed for range
+- [ ] For the "pride" mode, it should be that every 16/32/64 beat there's a random chance that the pattern will speed up for a beat or two, or that the colors will shift really quickly  
 
 ## Investigations
 

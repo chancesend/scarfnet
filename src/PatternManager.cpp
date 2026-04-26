@@ -42,16 +42,38 @@ void PatternManager::initPatterns()
     Scarfnet::log("initPatterns()");
     _patterns = getPatternList();
     _currentPattern = _patterns.begin();
+    _lastUsed.assign(_patterns.size(), 0);
+    _selectCount = 0;
 }
 
 void PatternManager::incrementPattern(Rnd randomizer)
 {
-    // Pick a random pattern, excluding the current one.
-    size_t n    = _patterns.size();
-    size_t cur  = (size_t)(_currentPattern - _patterns.begin());
-    size_t idx  = (size_t)(randomizer % (n - 1));
-    if (idx >= cur) idx++;  // skip over current slot
-    auto newPattern = _patterns.begin() + (ptrdiff_t)idx;
+    // Weighted random selection biased toward patterns not seen recently.
+    // Weight for each candidate = (_selectCount - _lastUsed[i] + 1), so a pattern
+    // unseen for N presses has (N+1)x the weight of one just shown. All patterns
+    // start equal (weight 1) and the current pattern is always excluded.
+    size_t n   = _patterns.size();
+    size_t cur = (size_t)(_currentPattern - _patterns.begin());
+
+    uint32_t totalWeight = 0;
+    for (size_t i = 0; i < n; ++i) {
+        if (i == cur) continue;
+        totalWeight += (_selectCount - _lastUsed[i] + 1);
+    }
+
+    uint32_t pick  = (uint32_t)randomizer % totalWeight;
+    uint32_t accum = 0;
+    size_t   chosen = (cur + 1) % n;  // fallback: next pattern
+    for (size_t i = 0; i < n; ++i) {
+        if (i == cur) continue;
+        accum += (_selectCount - _lastUsed[i] + 1);
+        if (pick < accum) { chosen = i; break; }
+    }
+
+    _selectCount++;
+    _lastUsed[chosen] = _selectCount;
+
+    auto newPattern = _patterns.begin() + (ptrdiff_t)chosen;
     Scarfnet::log("Scarf::incrementPattern(). Changing pattern to %s", newPattern->first.c_str());
     changePatternFromString(newPattern->first, randomizer);
 }

@@ -57,17 +57,17 @@ inline fract8 timeFrac8(int time, int period) {
 
 // ── Pattern render functions (implemented in src/patterns/*.cpp) ─────────────
 
-void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat);
+void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, Rnd rnd, Rnd localRnd);
 void confetti(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t fade, uint16_t popChancePct);
 void firework(Leds& leds, int32_t timeMs, int periodMs, const CRGBPalette16& palette);
 void colorwaves(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat);
-void cylon(Leds& leds, int32_t timeMs, CRGB color, int width, int periodMs, fract8 blurAmount);
+void cylon(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t baseHue, uint8_t secondaryHue, int width, int basePeriodMs);
 void fractal(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, uint8_t spatialScale, Rnd rnd);
 void breathe(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, int32_t periodMs, uint8_t hueSpeed, Rnd rnd);
 void sparkle(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t sparkleRate);
 void dance(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, uint8_t hueSpeed, uint8_t macroPeriod, Rnd localRnd);
 void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, Rnd rnd, Rnd localRnd);
-void fillNoise(Leds& leds, int32_t timeMs);
+void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, Rnd rnd, Rnd localRnd);
 void digital(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const PatternContext& ctx);
 void debug(Leds& leds, const PatternContext& ctx);
 

@@ -54,6 +54,12 @@ private:
     Rnd _currentRandomizer {0};
     Rnd _localRnd          {0};  // re-randomized locally on each pattern/seed change
 
+    // Recency tracking for biased pattern selection.
+    // _lastUsed[i] = _selectCount value when pattern i was last chosen.
+    // Weight = (_selectCount - _lastUsed[i] + 1), so older patterns are favoured.
+    std::vector<uint32_t> _lastUsed;
+    uint32_t              _selectCount {0};
+
 
 };
 

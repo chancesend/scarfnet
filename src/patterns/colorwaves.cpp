@@ -7,8 +7,9 @@ void colorwaves(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const 
     // All animation parameters derived from timeMs — fully stateless.
     // beatsinT replaces FastLED's beatsin88 (which uses millis()) with a timeMs-based
     // equivalent so all scarves stay phase-locked on the same mesh time.
-    auto beatsinT = [timeMs](uint16_t bpm, uint16_t lo, uint16_t hi) -> uint16_t {
-        uint16_t phase = (uint16_t)((uint64_t)(uint32_t)timeMs * bpm * 65536 / 60000);
+    // bpm88 is in FastLED's 8.8 fixed-point format (same as beatsin88) — divide by 256 for actual BPM.
+    auto beatsinT = [timeMs](uint16_t bpm88, uint16_t lo, uint16_t hi) -> uint16_t {
+        uint16_t phase = (uint16_t)((uint64_t)(uint32_t)timeMs * bpm88 * 256 / 60000);
         return lo + (uint16_t)((uint32_t)(hi - lo) * (uint16_t)((int32_t)sin16(phase) + 32768) / 65536);
     };
 

@@ -2,18 +2,46 @@
 
 namespace Scarfnet {
 
-void cylon(Leds& leds, int32_t timeMs, CRGB color, int width, int periodMs, fract8 blurAmount)
-{
-    const auto timeFrac  = timeFrac8(timeMs, periodMs);
-    const auto cylonFrac = quadwave8(timeFrac);
-    const uint8_t lerpVal = lerp8by8(0, leds.size(), cylonFrac);
+// baseHue: very slowly drifting anchor (~4 min full palette cycle from timeMs >> 10).
+// secondaryHue: distinct palette offset, session-fixed — peeks through at the bar center.
+// basePeriodMs: beat-locked when tempo active, very slow 30–80 s otherwise.
+//   Period drifts ±1.5% over a ~90 s cycle — barely perceptible variation.
+//   Main hue oscillates ±12 units around baseHue over a ~20 s cycle.
 
-    for (int i = 0; i <= (int)leds.size(); ++i) {
-        const auto startLed = lerpVal - width / 2;
-        const auto stopLed  = lerpVal + width / 2;
-        leds[i] = (i >= startLed && i <= stopLed) ? color : CRGB::Black;
+void cylon(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
+           uint8_t baseHue, uint8_t secondaryHue, int width, int basePeriodMs)
+{
+    // Period drifts ±1.5% over ~90 s — barely perceptible, just enough to feel alive
+    uint16_t periodOscAngle = (uint16_t)((uint32_t)timeMs * 65536u / 90000u);
+    int32_t  periodOsc      = ((int32_t)sin16(periodOscAngle) * (basePeriodMs >> 6)) >> 15;
+    int      period         = max(200, basePeriodMs + (int)periodOsc);
+
+    // Hue oscillates ±12 units around baseHue over ~20 s
+    uint16_t hueOscAngle = (uint16_t)((uint32_t)timeMs * 65536u / 20000u);
+    int8_t   hueOsc      = (int8_t)((int32_t)sin16(hueOscAngle) * 12 >> 15);
+    uint8_t  hue         = baseHue + (uint8_t)hueOsc;
+
+    // Smooth bounce via quadwave8
+    const uint8_t frac   = timeFrac8(timeMs, period);
+    const int     center = (int)lerp8by8(0, (uint8_t)(kNumLeds - 1), quadwave8(frac));
+    const int     halfW  = max(1, width / 2);
+
+    for (int i = 0; i < kNumLeds; ++i) {
+        int dist = abs(i - center);
+        if (dist > halfW) { leds[i] = CRGB::Black; continue; }
+
+        // t: 0=center, 255=edge. Quadratic falloff for soft, natural edges.
+        uint8_t t    = (uint8_t)((uint32_t)dist * 255u / (uint32_t)halfW);
+        uint8_t fade = 255 - (uint8_t)(((uint16_t)t * t) >> 8);
+
+        CRGB mainColor = ColorFromPalette(palette, hue, fade, LINEARBLEND);
+
+        // Secondary palette color subtly reflected at the center of the bar
+        uint8_t secAmt = (uint8_t)((uint16_t)(255 - t) * 40u >> 8);  // max ~40 at center
+        CRGB secColor  = ColorFromPalette(palette, secondaryHue, 255, LINEARBLEND);
+
+        leds[i] = blend(mainColor, secColor, secAmt);
     }
-    blur1d(leds.data(), leds.size(), blurAmount);
 }
 
 } // namespace Scarfnet

@@ -12,7 +12,7 @@ PatternList getPatternList()
     PatternList patterns;
 
     patterns.push_back({"pride", [](Leds& leds, const PatternContext& ctx) {
-        pride(leds, ctx.timeMs, ctx.palette, ctx.beat);
+        pride(leds, ctx.timeMs, ctx.palette, ctx.beat, ctx.rnd, ctx.localRnd);
     }});
 
     patterns.push_back({"confetti", [](Leds& leds, const PatternContext& ctx) {
@@ -51,15 +51,16 @@ PatternList getPatternList()
     }});
 
     patterns.push_back({"cylon", [](Leds& leds, const PatternContext& ctx) {
-        int    width         = rndRange(ctx.rnd,  1,  10);       // bar width in LEDs
-        int    periodMs      = rndRange(ctx.rnd, 10,  60) * 100; // sweep cycle length
-        fract8 blurAmount    = rndRange(ctx.rnd,  0, 100);       // edge softness
-        uint8_t paletteShift = rndRange(ctx.rnd,  5,  15);       // palette scroll speed (bit-shift of timeMs)
-        CRGB   color         = ColorFromPalette(ctx.palette, (ctx.timeMs >> paletteShift) % 255);
-        // When a tempo is active, lock the sweep period to the beat so the bar
-        // bounces end-to-end in sync with the music.
-        if (ctx.beat.isActive()) periodMs = ctx.beat.intervalMs * 2;
-        cylon(leds, ctx.timeMs, color, width, periodMs, blurAmount);
+        int width = rndRange(ctx.rnd, 6, 16);  // bar is ~7–15 pixels wide
+        // Non-beat: very slow 30–80 s sweep; beat-locked: 2× beat interval
+        int basePeriodMs = ctx.beat.isActive()
+                           ? (int)ctx.beat.intervalMs * 2
+                           : rndRange(ctx.rnd, 30, 80) * 1000;
+        // Base hue drifts very slowly through the palette (~4 min full cycle)
+        uint8_t baseHue      = (uint8_t)(ctx.timeMs >> 10);
+        // Secondary: session-fixed palette offset for the center accent
+        uint8_t secondaryHue = baseHue + rndRange(ctx.rnd >> 4, 64, 192);
+        cylon(leds, ctx.timeMs, ctx.palette, baseHue, secondaryHue, width, basePeriodMs);
     }});
 
     patterns.push_back({"breathe", [](Leds& leds, const PatternContext& ctx) {
@@ -97,6 +98,10 @@ PatternList getPatternList()
         // ctx.rnd offsets the macro vibe signals → different 20-min trajectory each press.
         // ctx.localRnd provides per-device spatial/phase offsets.
         generative(leds, ctx.timeMs, ctx.palette, ctx.beat, ctx.rnd, ctx.localRnd);
+    }});
+
+    patterns.push_back({"beat", [](Leds& leds, const PatternContext& ctx) {
+        beat(leds, ctx.timeMs, ctx.palette, ctx.beat, ctx.rnd, ctx.localRnd);
     }});
 
     patterns.push_back({"digital", [](Leds& leds, const PatternContext& ctx) {

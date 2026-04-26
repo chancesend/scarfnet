@@ -68,10 +68,14 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 
         // sharedCoarse dominates hue; fine adds only a small local shimmer-shift [0..15]
         uint8_t hue = (sharedCoarse >> 1) + (fine >> 4) + (uint8_t)(t / 200) + rndHue + (localHue >> 1);
-        // vibeEnergy is shared — all scarves brighten and dim together
-        uint8_t bri = lerp8by8(100, qadd8(vibeEnergy, 80), qadd8(fine >> 1, coarse >> 2));
+        // vibeEnergy is shared — all scarves brighten and dim together.
+        // Minimum raised to 160 so dim LEDs still carry vivid color rather than going pastel.
+        uint8_t bri = lerp8by8(160, qadd8(vibeEnergy, 80), qadd8(fine >> 1, coarse >> 2));
 
-        leds[i] = ColorFromPalette(palette, hue, bri, LINEARBLEND);
+        // NOBLEND: pick the nearest palette entry rather than interpolating between two.
+        // Interpolation desaturates midpoints; NOBLEND keeps every LED at a fully
+        // saturated palette color.
+        leds[i] = ColorFromPalette(palette, hue, bri, NOBLEND);
     }
 
     // ── Layer 2: Moving energy streak ─────────────────────────────────────────
