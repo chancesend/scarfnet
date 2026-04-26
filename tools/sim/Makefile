@@ -29,7 +29,8 @@ SRCS := main.cpp \
         $(SRC_ROOT)/patterns/generative.cpp \
         $(SRC_ROOT)/patterns/pride.cpp \
         $(SRC_ROOT)/patterns/sparkle.cpp \
-        $(SRC_ROOT)/patterns/digital.cpp
+        $(SRC_ROOT)/patterns/digital.cpp \
+        $(SRC_ROOT)/patterns/debug.cpp 
 
 TARGET := scarfnet-sim
 

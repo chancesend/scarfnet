@@ -119,6 +119,14 @@ struct CRGB {
     CRGB& operator=(const CRGB&) = default;
     bool operator==(const CRGB& o) const { return r==o.r && g==o.g && b==o.b; }
 
+    CRGB  nscale8(uint8_t sc) const {
+        return CRGB(scale8(r, sc), scale8(g, sc), scale8(b, sc));
+    }
+    CRGB& operator+=(const CRGB& rhs) {
+        r = qadd8(r, rhs.r); g = qadd8(g, rhs.g); b = qadd8(b, rhs.b);
+        return *this;
+    }
+
     uint8_t getLuma() const {
         return (uint8_t)(((uint16_t)r*54 + (uint16_t)g*182 + (uint16_t)b*19) >> 8);
     }
@@ -234,6 +242,14 @@ inline CRGBPalette16 _makeHeat() {
     return p;
 }
 
+// ─── CHSV ─────────────────────────────────────────────────────────────────────
+// Defined after _hsv2rgb so the conversion can be inlined directly.
+struct CHSV {
+    uint8_t h, s, v;
+    CHSV(uint8_t h, uint8_t s, uint8_t v) : h(h), s(s), v(v) {}
+    operator CRGB() const { return _hsv2rgb(h, s, v); }
+};
+
 // Named palette globals (inline C++17 — one definition across TUs)
 inline const CRGBPalette16 RainbowColors_p        = _makeRainbow();
 inline const CRGBPalette16 RainbowStripeColors_p  = _makeRainbow();
@@ -267,6 +283,9 @@ inline CRGB ColorFromPalette(const CRGBPalette16& pal, uint8_t index,
 }
 
 // ─── LED operations ───────────────────────────────────────────────────────────
+inline void fill_solid(CRGB* leds, uint16_t num, const CRGB& color) {
+    for (uint16_t i = 0; i < num; ++i) leds[i] = color;
+}
 inline CRGB blend(const CRGB& a, const CRGB& b, fract8 amt) {
     return CRGB(lerp8by8(a.r, b.r, amt),
                 lerp8by8(a.g, b.g, amt),

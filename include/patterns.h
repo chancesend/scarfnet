@@ -65,7 +65,7 @@ void cylon(Leds& leds, int32_t timeMs, CRGB color, int width, int periodMs, frac
 void fractal(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, uint8_t spatialScale, Rnd rnd);
 void breathe(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, int32_t periodMs, uint8_t hueSpeed, Rnd rnd);
 void sparkle(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t sparkleRate);
-void dance(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, uint8_t hueSpeed, uint8_t macroPeriod);
+void dance(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, uint8_t hueSpeed, uint8_t macroPeriod, Rnd localRnd);
 void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, Rnd rnd, Rnd localRnd);
 void fillNoise(Leds& leds, int32_t timeMs);
 void digital(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const PatternContext& ctx);

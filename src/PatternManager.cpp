@@ -22,8 +22,7 @@ std::string PatternManager::getCurrentPattern()
 }
 
 void PatternManager::runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const BeatInfo& beat,
-                                       NodeId nodeId, NodeId lastPressId,
-                                       const NodeFlash* flashes, int flashCount)
+                                       const NodeInfo& nodeInfo)
 {
     PatternContext ctx;
     ctx.timeMs      = nodeTimeMs;
@@ -31,10 +30,10 @@ void PatternManager::runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const Beat
     ctx.rnd         = _currentRandomizer;
     ctx.localRnd    = _localRnd;
     ctx.beat        = beat;
-    ctx.nodeId      = nodeId;
-    ctx.lastPressId = lastPressId;
-    ctx.flashCount  = flashCount;
-    for (int i = 0; i < flashCount; i++) ctx.recentFlashes[i] = flashes[i];
+    ctx.nodeId      = nodeInfo.nodeId;
+    ctx.lastPressId = nodeInfo.lastPressId;
+    ctx.flashCount  = nodeInfo.flashCount;
+    for (int i = 0; i < nodeInfo.flashCount; i++) ctx.recentFlashes[i] = nodeInfo.flashes[i];
     _currentPattern->second(leds, ctx);
 }
 

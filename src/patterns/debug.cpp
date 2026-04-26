@@ -19,7 +19,7 @@ void debug(Leds& leds, const PatternContext& ctx)
 {
     constexpr uint8_t kFlashBrightness8 = 100;
     constexpr uint32_t kFlashFadeMs = 100;
-    constexpr uint8_t kDimScale8 = 5; // out of 256; lower = dimmer base glow
+    constexpr uint8_t kDimScale8 = 1; // out of 256; lower = dimmer base glow
 
     // Dim base: own persistent color so the scarf is always identifiable.
     CRGB base = nodeColor(ctx.nodeId);
@@ -38,7 +38,7 @@ void debug(Leds& leds, const PatternContext& ctx)
     // Sparkle white if this scarf last changed the pattern.
     if (ctx.nodeId != 0 && ctx.lastPressId == ctx.nodeId) {
         if (random8() < 25)
-            leds[random16() % leds.size()] = CRGB::White;
+            leds[random16() % leds.size()] = CRGB(CRGB::White).nscale8(kFlashBrightness8);
     }
 }
 

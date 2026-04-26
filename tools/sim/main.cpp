@@ -90,7 +90,32 @@ static void cursorHome() { printf("\033[H"); }
 struct SimScarf {
     PatternManager pm;
     Leds           leds;
-    SimScarf() : leds(kNumLeds) {}
+    NodeId         nodeId;
+    NodeFlash      flashes[kMaxNodeFlashes];
+    int            flashCount    = 0;
+    uint32_t       nextHeartbeat = 0;  // wall-clock ms when this scarf next "broadcasts"
+
+    explicit SimScarf(int idx)
+        : leds(kNumLeds)
+        , nodeId(0x53430001u + (NodeId)idx)
+        // Stagger initial heartbeats so they don't all fire at once.
+        , nextHeartbeat((uint32_t)(wallMs() + idx * 1200))
+    {}
+
+    // Record a heartbeat arrival from `senderId`.
+    void receiveHeartbeat(NodeId senderId, uint32_t now) {
+        for (int i = 0; i < flashCount; i++) {
+            if (flashes[i].id == senderId) { flashes[i].when = now; return; }
+        }
+        if (flashCount < kMaxNodeFlashes) {
+            flashes[flashCount++] = {senderId, now};
+        } else {
+            int oldest = 0;
+            for (int i = 1; i < kMaxNodeFlashes; i++)
+                if (flashes[i].when < flashes[oldest].when) oldest = i;
+            flashes[oldest] = {senderId, now};
+        }
+    }
 };
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -105,7 +130,8 @@ int main()
 
     srand((unsigned)wallMs());
 
-    Rnd      globalRnd = (Rnd)(rand() & 0xFFFF);
+    Rnd      globalRnd    = (Rnd)(rand() & 0xFFFF);
+    NodeId   lastPressId  = 0;
     TapTempo tapTempo;
 
     // Scarves — each PatternManager gets a fresh localRnd via random16() on
@@ -113,7 +139,7 @@ int main()
     std::vector<SimScarf*> scarves;
 
     auto addScarf = [&]() {
-        auto* s = new SimScarf();
+        auto* s = new SimScarf((int)scarves.size());
         if (!scarves.empty()) {
             // Sync new scarf to the current fleet pattern + seed.
             s->pm.changePatternFromString(
@@ -129,7 +155,8 @@ int main()
     for (int i = 0; i < 4; ++i) addScarf();
 
     auto nextPattern = [&]() {
-        globalRnd = (Rnd)wallMs();
+        globalRnd   = (Rnd)wallMs();
+        lastPressId = scarves[0]->nodeId;
         scarves[0]->pm.incrementPattern(globalRnd);
         auto pat = scarves[0]->pm.getCurrentPattern();
         for (size_t i = 1; i < scarves.size(); ++i)
@@ -137,7 +164,8 @@ int main()
     };
 
     auto newSeed = [&]() {
-        globalRnd = (Rnd)wallMs();
+        globalRnd   = (Rnd)wallMs();
+        lastPressId = scarves[0]->nodeId;
         auto pat = scarves[0]->pm.getCurrentPattern();
         for (auto* s : scarves)
             s->pm.changePatternFromString(pat, globalRnd);
@@ -183,8 +211,27 @@ int main()
         }
         lastFrameMs = now;
 
-        for (auto* s : scarves)
-            s->pm.runCurrentPattern(s->leds, now, beat);
+        // Simulate heartbeat exchanges: each scarf "broadcasts" to all others
+        // at kHeartbeatIntervalMs, so the debug pattern has flash data to show.
+        constexpr uint32_t kHeartbeatIntervalMs = 5000;
+        for (auto* sender : scarves) {
+            if (now >= sender->nextHeartbeat) {
+                sender->nextHeartbeat = now + kHeartbeatIntervalMs;
+                for (auto* receiver : scarves) {
+                    if (receiver != sender)
+                        receiver->receiveHeartbeat(sender->nodeId, now);
+                }
+            }
+        }
+
+        for (auto* s : scarves) {
+            NodeInfo nodeInfo;
+            nodeInfo.nodeId     = s->nodeId;
+            nodeInfo.lastPressId = lastPressId;
+            nodeInfo.flashes    = s->flashes;
+            nodeInfo.flashCount = s->flashCount;
+            s->pm.runCurrentPattern(s->leds, now, beat, nodeInfo);
+        }
 
         // ── Render ─────────────────────────────────────────────────────────────
         cursorHome();

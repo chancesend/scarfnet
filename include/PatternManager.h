@@ -9,6 +9,13 @@
 namespace Scarfnet
 {
 
+struct NodeInfo {
+    NodeId nodeId;
+    NodeId lastPressId;
+    const NodeFlash* flashes;
+    int flashCount;
+};
+
 // Owns the LED pattern list and tracks which pattern is currently active.
 // All pattern changes are driven through this class so state stays consistent.
 class PatternManager
@@ -24,8 +31,7 @@ public:
 
     // Renders the current pattern into leds using the given mesh timestamp and beat state.
     void runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const BeatInfo& beat,
-                           NodeId nodeId, NodeId lastPressId,
-                           const NodeFlash* flashes, int flashCount);
+                            const NodeInfo& nodeInfo);
 
     // Advances to the next pattern and updates the randomizer seed from the press timestamp.
     void incrementPattern(Rnd randomizer);

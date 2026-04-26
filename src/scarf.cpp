@@ -105,7 +105,7 @@ void Scarf::onReceived(const HeartbeatPacket& pkt)
 {
     if (pkt.version > kScarfVersion)
         _newerVersionSeen = true;
-        
+
     this->debugModeUpdate(pkt);
 
     if (!shouldAcceptUpdate(pkt.changeIndex, _changeIndex))
@@ -312,8 +312,18 @@ void Scarf::showBuiltInLED()
 
 void Scarf::showLEDs()
 {
-    _patternManager->runCurrentPattern(_ledsReal, _mesh->timeMs(), _tapTempo.beatInfo(_timeMsec),
-        _mesh->nodeId(), _lastPressId, _nodeFlashes, _nodeFlashCount);
+    NodeInfo nodeInfo {
+        .nodeId = _mesh->nodeId(),
+        .lastPressId = _lastPressId,
+        .flashes = _nodeFlashes,
+        .flashCount = _nodeFlashCount
+    };
+    
+    _patternManager->runCurrentPattern(
+        _ledsReal, 
+        _mesh->timeMs(), 
+        _tapTempo.beatInfo(_timeMsec),
+        nodeInfo);
 }
 
 void Scarf::blinkNumNodes()

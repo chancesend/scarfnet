@@ -94,7 +94,7 @@ PatternList getPatternList()
     patterns.push_back({"dance", [](Leds& leds, const PatternContext& ctx) {
         uint8_t hueSpeed    = rndRange(ctx.rnd, 80, 220);   // color drift rate
         uint8_t macroPeriod = (ctx.rnd & 1) ? 64 : 32;     // wild window every 32 or 64 beats
-        dance(leds, ctx.timeMs, ctx.palette, ctx.beat, hueSpeed, macroPeriod);
+        dance(leds, ctx.timeMs, ctx.palette, ctx.beat, hueSpeed, macroPeriod, ctx.localRnd);
     }});
 
     patterns.push_back({"generative", [](Leds& leds, const PatternContext& ctx) {
