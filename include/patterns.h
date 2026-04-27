@@ -62,7 +62,7 @@ inline fract8 timeFrac8(uint32_t time, uint32_t period) {
 void pride(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, Rnd rnd, Rnd localRnd);
 void confetti(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, uint8_t fade, uint16_t popChancePct);
 void firework(Leds& leds, int32_t timeMs, int periodMs, const CRGBPalette16& palette);
-void colorwaves(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat);
+void colorwaves(Leds& leds, const PatternContext& ctx);
 void cylon(Leds& leds, const PatternContext& ctx);
 void fractal(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, uint8_t spatialScale, Rnd rnd);
 void breathe(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const BeatInfo& beat, int32_t periodMs, uint8_t hueSpeed, Rnd rnd);
