@@ -29,9 +29,9 @@ void colorwaves(Leds& leds, int32_t timeMs, const CRGBPalette16& palette, const 
     constexpr uint16_t kHueIncMin         = 300;
     constexpr uint16_t kHueIncMax         = 1500;
     // How many times faster hue scrolls on the last beat of a phrase
-    constexpr uint8_t  kPhraseHueMult     = 5;
+    constexpr uint8_t  kPhraseHueMult     = 4;
     // How quickly new colors blend in each frame [0=no update, 255=instant]
-    constexpr uint8_t  kBlendAmount       = 128;
+    constexpr uint8_t  kBlendAmount       = 100;
 
     uint8_t  brightdepth        = (uint8_t)beatsinT(kBrightDepthBpm88, kBrightDepthMin, kBrightDepthMax);
     uint16_t brightnessthetainc = beatsinT(kBrightThetaBpm88, kBrightThetaMin, kBrightThetaMax);

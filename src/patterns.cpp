@@ -19,7 +19,8 @@ PatternList getPatternList()
         uint8_t fadeSpeed = rndRange(ctx.rnd,  1,  25);  // lower = slower fade
         uint16_t popChance = rndRange(ctx.rnd,  0, 100);  // % chance a pixel pops per tick
         // On beat: saturate pop chance for a dense burst, then let it decay normally.
-        if (ctx.beat.isOnBeat(80)) popChance = 500;
+        if (ctx.beat.isOnBeat(80)) popChance = 400;
+        if (ctx.beat.isOnBar(120)) popChance = 800;
         confetti(leds, ctx.timeMs, ctx.palette, fadeSpeed, popChance);
     }});
 
@@ -51,16 +52,7 @@ PatternList getPatternList()
     }});
 
     patterns.push_back({"cylon", [](Leds& leds, const PatternContext& ctx) {
-        int width = rndRange(ctx.rnd, 6, 16);  // bar is ~7–15 pixels wide
-        // Non-beat: very slow 30–80 s sweep; beat-locked: 2× beat interval
-        int basePeriodMs = ctx.beat.isActive()
-                           ? (int)ctx.beat.intervalMs * 2
-                           : rndRange(ctx.rnd, 30, 80) * 1000;
-        // Base hue drifts very slowly through the palette (~4 min full cycle)
-        uint8_t baseHue      = (uint8_t)(ctx.timeMs >> 10);
-        // Secondary: session-fixed palette offset for the center accent
-        uint8_t secondaryHue = baseHue + rndRange(ctx.rnd >> 4, 64, 192);
-        cylon(leds, ctx.timeMs, ctx.palette, baseHue, secondaryHue, width, basePeriodMs);
+        cylon(leds, ctx);
     }});
 
     patterns.push_back({"breathe", [](Leds& leds, const PatternContext& ctx) {
