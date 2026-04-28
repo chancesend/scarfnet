@@ -25,10 +25,7 @@ PatternList getPatternList()
     }});
 
     patterns.push_back({"firework", [](Leds& leds, const PatternContext& ctx) {
-        int periodMs = rndRange(ctx.rnd, 10, 85) * 100;  // launch cycle length
-        // When a tempo is active, lock launch cadence to the beat.
-        if (ctx.beat.isActive()) periodMs = ctx.beat.intervalMs;
-        firework(leds, ctx.timeMs, periodMs, ctx.palette);
+        firework(leds, ctx);
     }});
 
     patterns.push_back({"colorwaves", [](Leds& leds, const PatternContext& ctx) {
@@ -52,22 +49,7 @@ PatternList getPatternList()
     }});
 
     patterns.push_back({"sparkle", [](Leds& leds, const PatternContext& ctx) {
-        uint8_t sparkleRate = rndRange(ctx.rnd, 1, 6);  // very sparse baseline
-
-        // Organic burst every ~2 min: slow noise (ctx.rnd shifts burst timing per fleet
-        // press so the burst cadence isn't always at the same point in the session).
-        // inoise8 clusters around 128; values above 195 are uncommon — roughly 1-2
-        // sustained bursts per 20-minute session, each lasting 20-60 seconds.
-        uint8_t burstNoise = inoise8((uint32_t)ctx.timeMs / 18000, (uint8_t)ctx.rnd);
-        if (burstNoise > 195) {
-            uint8_t excess = burstNoise - 195;      // 0–60 typical range
-            sparkleRate = qadd8(sparkleRate, min((int)excess * 3, 70));
-        }
-
-        // On beat: moderate pop, not a full whiteout
-        if (ctx.beat.isOnBeat(80)) sparkleRate = qadd8(sparkleRate, 60);
-
-        sparkle(leds, ctx.timeMs, ctx.palette, sparkleRate);
+        sparkle(leds, ctx);
     }});
 
     patterns.push_back({"dance", [](Leds& leds, const PatternContext& ctx) {

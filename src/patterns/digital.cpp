@@ -34,13 +34,10 @@ void digital(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
     const BeatInfo& active = b.isActive() ? b : slowBeat;
 
     const uint32_t beatNum = active.beatNumber;
-    const uint8_t  baseHue = (uint8_t)(timeMs >> 7);  // ~8 s full cycle
 
-    // Session-fixed parameters
-    const uint8_t holdBeats  = rndRange(rnd,      2, 5);  // beats each pixel persists
-    const uint8_t addPerBeat = rndRange(rnd >> 4, 2, 7);  // base LEDs added per beat
-
-    // Wild level: only active with tap-tempo; stacks at 8/16/32-beat boundaries
+    // Wild level: only active with tap-tempo; stacks at 8/16/32-beat boundaries.
+    // Computed from the original beatNum so phrase starts fire correctly even
+    // when the speedup zone is active at the end of the previous phrase.
     uint8_t wildLevel = 0;
     if (b.isActive()) {
         if (beatNum % 8  == 0) wildLevel = 1;
@@ -48,16 +45,56 @@ void digital(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         if (beatNum % 32 == 0) wildLevel = 3;
     }
 
+    // ── Phrase-end 4× speedup ─────────────────────────────────────────────────
+    // During the last 2 beats of any 16/32/64-beat phrase, run the pattern at 4×:
+    // a virtual beat at intervalMs/4 drives faster pixel churn, and renderTimeMs
+    // advances 4× faster so hue rotation also accelerates.
+    const BeatInfo* renderBeat = &active;
+    uint32_t renderTimeMs = (uint32_t)timeMs;
+    BeatInfo fastBeat;
+
+    if (b.isActive()) {
+        const uint16_t phraseLens[3] = {16, 32, 64};
+        for (int p = 0; p < 3; ++p) {
+            uint16_t phraseLen    = phraseLens[p];
+            uint16_t beatInPhrase = (uint16_t)(beatNum % phraseLen);
+            if (beatInPhrase < phraseLen - 2) continue;
+
+            // How far (ms) we are into the 2-beat wild window
+            uint32_t posInWindowMs = (uint32_t)(beatInPhrase - (phraseLen - 2))
+                                   * b.intervalMs + b.phaseMs;
+            // Scale time: grows 4× as fast from window start
+            renderTimeMs = (uint32_t)timeMs - posInWindowMs + posInWindowMs * 4u;
+            // Virtual beat at ¼ the interval; phase and number scaled accordingly
+            uint16_t fastInterval = (uint16_t)max(1u, (uint32_t)b.intervalMs / 4u);
+            fastBeat = BeatInfo{
+                fastInterval,
+                (uint16_t)(b.phaseMs % fastInterval),
+                (uint16_t)(beatNum * 4u + b.phaseMs / fastInterval)
+            };
+            renderBeat = &fastBeat;
+            break;
+        }
+    }
+
+    const uint32_t renderBeatNum = renderBeat->beatNumber;
+    const uint8_t  baseHue = (uint8_t)(renderTimeMs >> 7);  // ~8 s full cycle, 4× faster at phrase end
+
+    // Session-fixed parameters
+    const uint8_t holdBeats  = rndRange(rnd,      2, 5);  // beats each pixel persists
+    const uint8_t addPerBeat = rndRange(rnd >> 4, 2, 7);  // base LEDs added per beat
+
     // Per-phrase character: shifts the wild accent hue each 8-beat phrase
-    const uint8_t phraseChar = (uint8_t)((beatNum / 8u) * 97u ^ (uint8_t)rnd);
+    const uint8_t phraseChar = (uint8_t)((beatNum / 8u) * 97u ^ (uint8_t)rnd);  // original beatNum — stable across speedup
 
     // ── Build lit set from sliding window of recent beats ───────────────────
     // Iterate newest→oldest; first match wins so newer additions take priority.
     // litAge: 0=dark, 1=oldest/dimmest, holdBeats=just added/brightest.
+    // Uses renderBeatNum so pixel churn accelerates 4× during the speedup zone.
     uint8_t litAge[kNumLeds] = {};
 
     for (uint8_t k = 0; k < holdBeats; ++k) {
-        uint32_t pastBeat = beatNum - (uint32_t)k;
+        uint32_t pastBeat = renderBeatNum - (uint32_t)k;
         // Current beat gets the wild boost; past beats run at base rate
         uint8_t kAdd   = (k == 0) ? addPerBeat + wildLevel * 2 : addPerBeat;
         uint8_t numAdd = rndRange((Rnd)((uint16_t)(pastBeat * 137u) ^ rnd), 1, kAdd + 1);
@@ -84,11 +121,12 @@ void digital(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 
     // ── Wild phrase overlay (tap-tempo only) ────────────────────────────────
     if (wildLevel > 0) {
-        // Decay window scales with wildLevel: longer decay = more dramatic
+        // Decay window scales with wildLevel: longer decay = more dramatic.
+        // Uses original active beat (phrase-start events) not the speedup beat.
         uint8_t wildFlash = active.sawTime((uint16_t)(active.intervalMs * wildLevel));
         if (wildFlash > 0) {
             // Fast color spin + phraseChar shifts starting hue each phrase
-            uint8_t wildHue   = phraseChar + (uint8_t)(timeMs >> 3);
+            uint8_t wildHue   = phraseChar + (uint8_t)(renderTimeMs >> 3);
             uint8_t wildCount = wildLevel * 3;
             for (uint8_t j = 0; j < wildCount; ++j) {
                 uint8_t pos = (uint8_t)((beatNum * (uint32_t)(j * 53u + 7u) ^ (uint32_t)local) % kNumLeds);

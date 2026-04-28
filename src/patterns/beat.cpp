@@ -179,6 +179,21 @@ void beat(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         if (f > 0)
             for (auto& led : leds) led = blend(led, CRGB::White, f);
     }
+
+    // ── K. Wild-zone cascade (last 2 beats of 16/32/64-beat phrases) ─────────
+    // The 2-beat window is split into 8 sub-slots; each scarf fires only on
+    // the one slot matching its localRnd, so the fleet produces a staggered
+    // ripple rather than all scarves bursting simultaneously.
+    // Individual LEDs sparkle at a rate proportional to wildBright so the
+    // burst has texture rather than being a flat white overlay.
+    {
+        uint8_t wild = wildZoneBright(b, localRnd);
+        if (wild > 0) {
+            for (int i = 0; i < kNumLeds; ++i) {
+                if (random8() < wild) leds[i] = CRGB::White;
+            }
+        }
+    }
 }
 
 } // namespace Scarfnet
