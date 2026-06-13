@@ -170,6 +170,9 @@ void Scarf::setup()
         case kLedType_Adafruit:
             FastLED.addLeds<ADAFRUIT, kLedPin>(_ledsReal.data(), _ledsReal.size());
             break;
+        case kLedType_Bike:
+            FastLED.addLeds<BIKE, kLedPin>(_ledsReal.data(), _ledsReal.size());
+            break;
         case kLedType_Amazon:
         default:
             FastLED.addLeds<AMAZON, kLedPin>(_ledsReal.data(), _ledsReal.size());

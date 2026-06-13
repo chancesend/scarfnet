@@ -23,16 +23,16 @@ const int kButtonPin = 39;
 enum ELedType: int {
     kLedType_Adafruit = 0,
     kLedType_Amazon = 1,
+    kLedType_Bike = 2,
 
     kLedType_Count,
 };
 
 template<uint8_t DATA_PIN> class ADAFRUIT : public WS2812Controller800Khz<DATA_PIN, GRB> {};
 template<uint8_t DATA_PIN> class AMAZON : public WS2812Controller800Khz<DATA_PIN, RGB> {};
+template<uint8_t DATA_PIN> class BIKE : public WS2812Controller800Khz<DATA_PIN, BGR> {};
 template<uint8_t DATA_PIN> class M5_INTERNAL_TYPE : public WS2812Controller800Khz<DATA_PIN, GRB> {};
 
-//#define LED_TYPE ADAFRUIT
-#define LED_TYPE AMAZON
 #endif // SCARFNET_EMBEDDED
 
 #include "typedefs.h"
