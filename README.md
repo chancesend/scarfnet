@@ -17,12 +17,16 @@ One complete scarf node requires the following:
 
 [ATOM Lite ESP32 IoT Development Kit](https://shop.m5stack.com/products/atom-lite-esp32-development-kit)
 
+This is the core of Scarfnet. 
+
+Any ESP32 controller will work, but if you do not use this specific controller, then your IO pins and button may be on a separate GPIO and thus might require custom Scarfnet firmware for your unit. And if that is the case, then you won't be able to use OTA updating from other scarves in the future. So just use this one.
+
 ![Controller and USB battery](docs/images/IMG_6890.jpg)
 
 ### Battery
 
 Any small ~5000mAh USB battery pack works. Tested with:
-[Amazon B0FJG8YKQH](https://www.amazon.com/dp/B0FJG8YKQH)
+[SIXTHGU Portable Charger](https://www.amazon.com/dp/B0FJG8YKQH)
 
 I recommend getting them anywhere except Amazon if at all possible.
 
@@ -56,9 +60,9 @@ Any of these will work and produce matching colors with other scarves:
 
 | Option | Link |
 |---|---|
-| Adafruit NeoPixel LED Dots | [Adafruit #3631](https://www.adafruit.com/product/3631) |
-| Amazon WS2812B | [Amazon B01AG923GI](https://www.amazon.com/dp/B01AG923GI) |
-| Adafruit NeoPixel LED Ball | [Adafruit #5984](https://www.adafruit.com/product/5984) |
+| Adafruit NeoPixel LED Dots | <https://www.adafruit.com/product/3631> |
+| ALITOVE WS2811 12mm waterproof 5V | <https://www.amazon.com/dp/B01AG923GI> |
+| Adafruit NeoPixel LED Ball | <https://www.adafruit.com/product/5984> |
 
 I recommend the Adafruit NeoPixel LED Dots, to avoid Amazon where possible.
 
@@ -67,7 +71,9 @@ I recommend the Adafruit NeoPixel LED Dots, to avoid Amazon where possible.
 ### Scarf
 
 Any white infinity scarf with a zippered pocket works. Tested with:
-[Hidden Zipper Pocket Scarf](https://www.amazon.com/dp/B01N4C65RE) — Fashion Scarf for Women
+[Hidden Zipper Pocket Scarf](https://www.amazon.com/dp/B01N4C65RE).
+
+Basically, any ~30-40 inch infinity scarf will work, but I'm sure you can think of other form factors to use. We've mounted Scarfnets on bikes, backpacks, etc - just make sure there's a spot to put the controller and battery. But we do find infinity scarves to be the most modular and useful.
 
 ### Assembly
 
