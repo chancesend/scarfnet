@@ -7,7 +7,7 @@
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
 // Version 100 = 1.00, version 102 = 1.02, etc
-const uint16_t kScarfVersion              = 103;
+const uint16_t kScarfVersion              = 104;
 
 // ── ObservableButton ─────────────────────────────────────────────────────────
 const uint32_t kButtonPollIntervalMs       = 50;

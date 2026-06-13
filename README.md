@@ -24,7 +24,7 @@ One complete scarf node requires the following:
 Any small ~5000mAh USB battery pack works. Tested with:
 [Amazon B0FJG8YKQH](https://www.amazon.com/dp/B0FJG8YKQH)
 
-I recommend getting them anywher except Amazon if at all possible.
+I recommend getting them anywhere except Amazon if at all possible.
 
 The battery connects to the USB-C port on the controller via a short USB-A or USB-C cable. Smaller is better — everything needs to fit in the scarf's zippered pocket.
 
@@ -69,13 +69,23 @@ I recommend the Adafruit NeoPixel LED Dots, to avoid Amazon where possible.
 Any white infinity scarf with a zippered pocket works. Tested with:
 [Hidden Zipper Pocket Scarf](https://www.amazon.com/dp/B01N4C65RE) — Fashion Scarf for Women
 
+### Assembly
+
+First, unzip the pocket and unstitch a few stitches from the inside so that you can feed the LED strand through inside the scarf. Eventually, you will have fed all of the LEDs through. Tie the first and last LEDs together (I use a twist-tie) inside the scarf so that they don't bunch up.
+
+Then, leaving the JST-SM end out, sew up the part of the pocket you opened except for the last bit where the cable sticks out.
+
+Now, create your Grove-to-JST-SM connector. Make sure to connect the JST-SM side in such a way that the wires match up with the LED connector cable (Red to red, black to black, and then usually yellow will be in the middle). The white connector will be left unconnected.
+
+Finally, flash your M5 Atom controller to the latest Scarfnet firmware. The first time you will need to connect it to a computer and use PlatformIO to build and upload the firmware (or have the Scarfnet creator do it for you). After that, however, subsequent upgrades can happen over-the-air from another upgraded Scarfnet unit.
+
 ### Assembled
 
 Everything fits inside the zippered pocket: M5 controller, USB battery, USB-A to USB-C cable, and the custom Grove-to-JST-SM connector.
 
 ![Contents of zippered pocket](docs/images/IMG_6893.jpg)
 
-## Getting Started
+## Getting Started - software
 
 Create `include/login.h` (gitignored) with your mesh credentials:
 
@@ -84,7 +94,10 @@ Create `include/login.h` (gitignored) with your mesh credentials:
 const char* kMeshSSID     = "your-mesh-ssid";
 const char* kMeshPassword = "your-mesh-password";
 const uint16_t kMeshPort  = 5555;
+constexpr const char* kOtaHttpUser = "your-ota-http-user";
 ```
+
+The main Scarfnet network has a unique SSID, password, and username. If you want to be a part of this main network, you should ask the Scarfnet creator or just have them flash your unit.
 
 ## Build & Flash
 
