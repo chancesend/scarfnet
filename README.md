@@ -64,7 +64,11 @@ Any of these will work and produce matching colors with other scarves:
 | ALITOVE WS2811 12mm waterproof 5V | <https://www.amazon.com/dp/B01AG923GI> |
 | Adafruit NeoPixel LED Ball | <https://www.adafruit.com/product/5984> |
 
-I recommend the Adafruit NeoPixel LED Dots, to avoid Amazon where possible.
+The important thing is that Scarfnet only supports a max of 25 LEDs (due to current and wattage limitations). 20-LED scarves will work just fine, but the last 5 pixels of the pattern just won't show.
+
+I recommend the Adafruit NeoPixel LED Dots, to avoid Amazon where possible. 
+
+If you buy the ALITOVE strand, those have 50 LEDs in a strand, so you will be able to make 2 scarves out of one strand - you will need to cut the strand in half and attach a JST-SM connector on the second unit.
 
 > **Note:** Other WS2812-compatible strands may work but could have a different RGB channel order, causing color mismatches between scarves. By default, the scarf selects the color order for the Adafruit NeoPixel LED Dots above. To switch to either of the other styles, use the extra-long button press on the controller to cycle the LED type and select the correct color order for your strip.
 
