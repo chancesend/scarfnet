@@ -66,16 +66,20 @@ void dance(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         for (int s = 0; s < sweepCount; ++s) {
             uint32_t tOff = ((uint32_t)timeMs + (uint32_t)s * period / sweepCount) % period;
             uint8_t  frac = (uint8_t)(tOff * 255 / period);
-            uint8_t  pos  = (uint8_t)((uint16_t)quadwave8(frac) * kNumLeds >> 8);
+            // Fixed-point position in 256ths of a LED — sub-pixel resolution so the
+            // linear falloff smoothly varies across the beam rather than snapping to
+            // only `width` distinct brightness values at integer LED positions.
+            uint16_t posFP   = (uint16_t)((uint32_t)quadwave8(frac) * (uint32_t)((kNumLeds - 1) * 256u) / 255u);
+            int32_t  widthFP = (int32_t)width * 256;
             constexpr uint8_t kCylonBrightness = 220;  // peak brightness of the cylon beam
             uint8_t  cylHue = hue + (uint8_t)(s * 128);
             CRGB cylColor = ColorFromPalette(palette, cylHue, kCylonBrightness, LINEARBLEND);
             uint8_t maxAmt = wildWindow ? kCylonBrightness : lerp8by8(50, 10, flash);
 
             for (int i = 0; i < kNumLeds; ++i) {
-                uint8_t dist = (uint8_t)abs(i - (int)pos);
-                if (dist < width) {
-                    uint8_t amt = lerp8by8(maxAmt, 0, (uint8_t)(dist * 255 / width));
+                int32_t distFP = abs((int32_t)((uint32_t)i * 256u) - (int32_t)posFP);
+                if (distFP < widthFP) {
+                    uint8_t amt = lerp8by8(maxAmt, 0, (uint8_t)((uint32_t)distFP * 255u / (uint32_t)widthFP));
                     leds[i] = blend(leds[i], cylColor, amt);
                 }
             }

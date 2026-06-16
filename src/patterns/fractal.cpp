@@ -49,8 +49,11 @@ void fractal(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
 
         // fBm blend: coarser octave drives most of the hue so the slow drift
         // is clearly visible; finer octaves contribute detail and shimmer.
-        uint8_t hue        = (coarse >> 2) + (mid >> 1) + (fine >> 1);
-        uint8_t brightness = lerp8by8(kMinBrightness, kMaxBrightness, qadd8(fine >> 1, mid >> 2));
+        // Sum in uint16_t before shifting so small values (e.g. coarse=1) aren't
+        // zeroed by early truncation: (coarse>>2)+(mid>>1)+(fine>>1) loses those bits.
+        uint8_t hue        = (uint8_t)(((uint16_t)coarse + (uint16_t)mid * 2u + (uint16_t)fine * 2u) >> 2);
+        uint8_t brightness = lerp8by8(kMinBrightness, kMaxBrightness,
+                                      (uint8_t)(((uint16_t)fine * 2u + mid) >> 2));
 
         leds[i] = ColorFromPalette(palette, hue, brightness, LINEARBLEND);
     }

@@ -74,7 +74,9 @@ void generative(Leds& leds, int32_t timeMs, const CRGBPalette16& palette,
         uint8_t hue = (sharedCoarse >> 1) + (fine >> 4) + (uint8_t)(t / 200) + rndHue + (localHue >> 1);
         // vibeEnergy is shared — all scarves brighten and dim together.
         // Minimum raised to 160 so dim LEDs still carry vivid color rather than going pastel.
-        uint8_t bri = lerp8by8(160, qadd8(vibeEnergy, 80), qadd8(fine >> 1, coarse >> 2));
+        // Sum in uint16_t before shifting to avoid zeroing small values early.
+        uint8_t bri = lerp8by8(160, qadd8(vibeEnergy, 80),
+                               (uint8_t)(((uint16_t)fine * 2u + coarse) >> 2));
 
         // NOBLEND: pick the nearest palette entry rather than interpolating between two.
         // Interpolation desaturates midpoints; NOBLEND keeps every LED at a fully

@@ -7,6 +7,7 @@
 #include "node_tracker/test_node_tracker.h"
 #include "observable_button/test_ObservableButton.h"
 #include "patterns/test_patterns.h"
+#include "patterns/test_cylon.h"
 #include "swarm/test_swarm_ema.h"
 #include "sync/test_sync.h"
 #include "tap_tempo/test_tap_tempo.h"
@@ -34,6 +35,7 @@ int main( int argc, char **argv) {
     mesh_tests();
     observable_button_tests();
     patterns_tests();
+    cylon_tests();
     swarm_ema_tests();
     sync_tests();
     tap_tempo_tests();

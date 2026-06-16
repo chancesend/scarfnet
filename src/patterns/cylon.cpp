@@ -91,11 +91,13 @@ void cylon(Leds& leds, const PatternContext& ctx)
         // Beam 1
         const int32_t dist1 = abs(iFP - (int32_t)center1FP);
         if (dist1 <= b1HalfWFP) {
-            uint8_t edgeFrac = (uint8_t)((uint32_t)dist1 * 255u / (uint32_t)b1HalfWFP);
-            uint8_t fade     = 255 - (uint8_t)(((uint16_t)edgeFrac * edgeFrac) >> 8);
+            // Quadratic falloff computed entirely in 32-bit: fade = 255*(hw²-d²)/hw²
+            // avoids the uint8_t truncation bug that caused bright spikes mid-beam.
+            const uint32_t hw1sq = (uint32_t)b1HalfWFP * (uint32_t)b1HalfWFP;
+            uint8_t fade   = (uint8_t)(255u * (hw1sq - (uint32_t)dist1 * (uint32_t)dist1) / hw1sq);
             CRGB c = ColorFromPalette(ctx.palette, hue1, fade, LINEARBLEND);
             // Accent color peeks through at the beam core
-            uint8_t secAmt = (uint8_t)((uint16_t)(255 - edgeFrac) * kSecColorMaxAmt >> 8);
+            uint8_t secAmt = (uint8_t)((uint32_t)kSecColorMaxAmt * (uint32_t)(b1HalfWFP - dist1) / (uint32_t)b1HalfWFP);
             CRGB accent = ColorFromPalette(ctx.palette, secondaryHue, 255, LINEARBLEND);
             pixel += blend(c, accent, secAmt);
         }
@@ -103,8 +105,8 @@ void cylon(Leds& leds, const PatternContext& ctx)
         // Beam 2
         const int32_t dist2 = abs(iFP - (int32_t)center2FP);
         if (dist2 <= b2HalfWFP) {
-            uint8_t edgeFrac = (uint8_t)((uint32_t)dist2 * 255u / (uint32_t)b2HalfWFP);
-            uint8_t fade     = 255 - (uint8_t)(((uint16_t)edgeFrac * edgeFrac) >> 8);
+            const uint32_t hw2sq = (uint32_t)b2HalfWFP * (uint32_t)b2HalfWFP;
+            uint8_t fade   = (uint8_t)(255u * (hw2sq - (uint32_t)dist2 * (uint32_t)dist2) / hw2sq);
             pixel += ColorFromPalette(ctx.palette, hue2, fade, LINEARBLEND);
         }
 

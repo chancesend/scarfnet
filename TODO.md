@@ -14,3 +14,5 @@
 - [ ] Investigate running on Zigbee (would require an upgraded ESP32)
 - [ ] What refactorings would make this more extensible and modular?
 - [ ] Figure out if there's a better way to form the network ad-hoc via button presses
+- [x] Figure out why some color fading seems to be less smooth / choppier than desired
+- [ ] Program it so that when one scarf is in tap-tempo mode, when another scarf enters tap-tempo mode it will sync to the currently tapped tempo, and that scarf can then adjust the tempo through normal tap methods
