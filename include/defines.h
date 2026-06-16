@@ -21,9 +21,9 @@ const int kNumBuiltinLeds = 1;
 const int kButtonPin = 39;
 
 enum ELedType: int {
-    kLedType_Adafruit = 0,
-    kLedType_Amazon = 1,
-    kLedType_Bike = 2,
+    kLedType_Adafruit = 0,  // GRB — Adafruit NeoPixel Dots
+    kLedType_Amazon = 1,    // RGB — ALITOVE WS2811 and some other generic Amazon strands
+    kLedType_Bike = 2,      // BGR — Adafruit NeoPixel LED Balls used in bike install
 
     kLedType_Count,
 };

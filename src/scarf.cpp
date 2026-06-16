@@ -153,7 +153,10 @@ void Scarf::setup()
         Scarfnet::log("LED type not set, defaulting to %i", kLedType_Amazon);
     }
     int ledType = _preferences.getInt(kLedTypeString, kLedType_Amazon);
-    Scarfnet::log("LED type %i loaded", ledType);
+    static const char* const kLedTypeNames[] = { "Adafruit", "Amazon", "Bike" };
+    const char* ledTypeName = (ledType >= 0 && ledType < kLedType_Count)
+                              ? kLedTypeNames[ledType] : "Unknown";
+    Scarfnet::log("LED type %i (%s) loaded", ledType, ledTypeName);
 
     _mesh = make_unique<Mesh>();
     _mesh->begin();
@@ -277,7 +280,7 @@ void Scarf::loop()
     }
     EVERY_N_MILLISECONDS(kPaletteBlendRateMs)
     {
-        _patternManager->blendPalette();
+        _patternManager->blendPalette(_timeMsec);
     }
 }
 

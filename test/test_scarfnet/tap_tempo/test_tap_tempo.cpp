@@ -2,6 +2,7 @@
 #include <tap_tempo.h>
 
 using Scarfnet::TapTempo;
+using Scarfnet::TimeMs;
 
 // ─── Initial state ───────────────────────────────────────────────────────────
 

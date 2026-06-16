@@ -7,7 +7,7 @@
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
 // Version 100 = 1.00, version 102 = 1.02, etc
-const uint16_t kScarfVersion              = 104;
+const uint16_t kScarfVersion              = 106;
 
 // ── ObservableButton ─────────────────────────────────────────────────────────
 const uint32_t kButtonPollIntervalMs       = 50;
@@ -15,8 +15,10 @@ const uint32_t kLongPressMs               = 1000;
 const uint32_t kExtraLongPressMs          = 7000;
 
 // ── Scarf: LED animation ─────────────────────────────────────────────────────
-const int kLedRefreshRateMs               = 15;
-const int kPaletteBlendRateMs             = 40;
+const int      kLedRefreshRateMs          = 15;
+const int      kPaletteBlendRateMs        = 30;   // how often palette is interpolated (ms)
+const uint32_t kPaletteTransitionMs       = 2000;
+const uint32_t kPatternTransitionMs       = 500;
 
 // ── Scarf: heartbeat & blink ─────────────────────────────────────────────────
 const uint32_t kHeartbeatIntervalMs       = 5000;

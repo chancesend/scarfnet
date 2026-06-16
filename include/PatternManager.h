@@ -41,8 +41,8 @@ public:
     // Returns true if the pattern was found and applied, false if the name was unrecognized.
     bool changePatternFromString(const std::string& pattern, Rnd randomizer);
 
-    // Steps the current palette one blend tick toward the target palette.
-    void blendPalette();
+    // Interpolates the current palette toward the target over kPaletteTransitionMs.
+    void blendPalette(TimeMs nodeTimeMs);
 
 private:
     void initPatterns();
@@ -53,6 +53,18 @@ private:
     CRGBPalette16 _targetPalette {RainbowColors_p};
     Rnd _currentRandomizer {0};
     Rnd _localRnd          {0};  // re-randomized locally on each pattern/seed change
+
+    // Pattern cross-fade: previous pattern state retained until transition completes.
+    PatternList::iterator _previousPattern;
+    Rnd      _previousRandomizer {0};
+    Rnd      _previousLocalRnd   {0};
+    TimeMs   _transitionStartMs  {0};   // 0 = no transition in progress
+    bool     _transitionPending  {false};
+
+    // Palette cross-fade: lerp from _prevPalette → _targetPalette over kPaletteTransitionMs.
+    CRGBPalette16 _prevPalette   {CRGB::Black};
+    TimeMs   _paletteStartMs     {0};   // 0 = no palette transition in progress
+    bool     _palettePending     {true};  // true on boot so palette fades in immediately
 
     // Recency tracking for biased pattern selection.
     // _lastUsed[i] = _selectCount value when pattern i was last chosen.

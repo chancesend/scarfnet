@@ -556,6 +556,25 @@ CRGBPalette16 getColorPalette(int8_t i)
   return palette;
 }
 
+const char* getPaletteName(int8_t i)
+{
+    static const char* const names[] = {
+        "Cloud", "Lava", "Ocean", "Forest",
+        "Rainbow", "RainbowStripe", "Party", "Heat",
+        "Sunset_Real", "es_rivendell_15", "es_ocean_breeze_036", "rgi_15",
+        "retro2_16", "Analogous_1", "es_pinksplash_08", "Coral_reef",
+        "es_ocean_breeze_068", "es_pinksplash_07", "es_vintage_01", "departure",
+        "es_landscape_64", "es_landscape_33", "rainbowsherbet", "gr65_hult",
+        "gr64_hult", "GMT_drywet", "ib_jul01", "es_vintage_57",
+        "ib15", "Fuschia_7", "es_emerald_dragon_08", "lava",
+        "fire", "Colorfull", "Magenta_Evening", "Pink_Purple",
+        "es_autumn_19", "BlacK_Blue_Magenta_White", "BlacK_Magenta_Red",
+        "BlacK_Red_Magenta_Yellow", "Blue_Cyan_Yellow",
+    };
+    static const int n = (int)(sizeof(names) / sizeof(names[0]));
+    return names[((unsigned)i) % n];
+}
+
 #else // !SCARFNET_EMBEDDED — native build: use the palettes from fastled_stub.h
 
 CRGBPalette16 getColorPalette(int8_t i)
@@ -572,6 +591,16 @@ CRGBPalette16 getColorPalette(int8_t i)
     };
     const int n = (int)(sizeof(palettes) / sizeof(palettes[0]));
     return palettes[((unsigned)i) % n];
+}
+
+const char* getPaletteName(int8_t i)
+{
+    static const char* const names[] = {
+        "Rainbow", "Forest", "Cloud", "Lava",
+        "Ocean", "Party", "Heat", "RainbowStripe",
+    };
+    static const int n = (int)(sizeof(names) / sizeof(names[0]));
+    return names[((unsigned)i) % n];
 }
 
 #endif // SCARFNET_EMBEDDED
