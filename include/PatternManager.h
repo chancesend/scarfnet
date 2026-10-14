@@ -3,6 +3,8 @@
 #include "mesh_types.h" // TimeMs
 #include "patterns.h"
 #include "palettes.h"
+#include "config.h"
+#include "transition.h"
 #include <cstdint>
 #include <memory>
 
@@ -56,15 +58,14 @@ private:
 
     // Pattern cross-fade: previous pattern state retained until transition completes.
     PatternList::iterator _previousPattern;
-    Rnd      _previousRandomizer {0};
-    Rnd      _previousLocalRnd   {0};
-    TimeMs   _transitionStartMs  {0};   // 0 = no transition in progress
-    bool     _transitionPending  {false};
+    Rnd        _previousRandomizer {0};
+    Rnd        _previousLocalRnd   {0};
+    Transition _patternFade {kPatternTransitionMs};
 
     // Palette cross-fade: lerp from _prevPalette → _targetPalette over kPaletteTransitionMs.
+    // Armed on boot so the palette fades in immediately.
     CRGBPalette16 _prevPalette   {CRGB::Black};
-    TimeMs   _paletteStartMs     {0};   // 0 = no palette transition in progress
-    bool     _palettePending     {true};  // true on boot so palette fades in immediately
+    Transition    _paletteFade   {kPaletteTransitionMs, /*armed=*/true};
 
     // Recency tracking for biased pattern selection.
     // _lastUsed[i] = _selectCount value when pattern i was last chosen.

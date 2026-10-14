@@ -7,6 +7,8 @@
 #include "log.h"
 #include "sync.h"
 #include "sync_state.h"
+#include "builtin_led.h"
+#include "heartbeat_builder.h"
 
 namespace Scarfnet
 {
@@ -34,21 +36,8 @@ Scarf::Scarf() :
 
 void Scarf::sendMessage()
 {
-    HeartbeatPacket pkt = {};
-    pkt.id               = _mesh->nodeId();
-    pkt.version          = kScarfVersion;
-    pkt.currentTimeMs    = _mesh->timeMs();
-    writeSyncState(pkt, _sync);
-    pkt.beatIntervalMs = _tapTempo.beatIntervalMs();
-    pkt.beatPhaseMs    = _tapTempo.beatPhaseMs(pkt.currentTimeMs);
-
-    const auto& patternName = _patternManager->getCurrentPattern();
-    size_t copyLen = patternName.size() < sizeof(pkt.pattern) - 1
-                     ? patternName.size()
-                     : sizeof(pkt.pattern) - 1;
-    memcpy(pkt.pattern, patternName.c_str(), copyLen);
-    pkt.pattern[copyLen] = '\0';
-
+    HeartbeatPacket pkt = buildHeartbeat(_mesh->nodeId(), _mesh->timeMs(), _sync,
+                                         _patternManager->getCurrentPattern(), _tapTempo);
     _mesh->broadcast(pkt);
 
     // Jitter the next interval so nodes on identical boot schedules drift apart.
@@ -108,33 +97,22 @@ void Scarf::onReceived(const HeartbeatPacket& pkt)
 
     this->debugModeUpdate(pkt);
 
-    // Sync beat info from any scarf that has an active tap-tempo.
-    // In tap-tempo mode we remain the authority only while actively tapping
-    // (within kMaxGapMs of the last local tap). If we're idle — including just
-    // after entering tap-tempo mode before the first tap — we follow the network
-    // so a second scarf entering tap-tempo naturally inherits the current tempo.
-    bool locallyTapping = _tapTempoMode &&
-                          (_mesh->timeMs() - _lastLocalTapMs) < TapTempo::kMaxGapMs;
-    if (pkt.beatIntervalMs != 0 && !locallyTapping) {
-        _tapTempo.setFromPacket(pkt.beatIntervalMs, pkt.currentTimeMs, pkt.beatPhaseMs);
-    } else if (pkt.beatIntervalMs == 0 && !_tapTempoMode) {
-        _tapTempo.reset();
-    }
+    // Beat info flows independently of pattern changes, on every heartbeat.
+    _tapTempo.followPacket(pkt.beatIntervalMs, pkt.currentTimeMs, pkt.beatPhaseMs,
+                           _tapTempoMode, _mesh->timeMs());
 
-    // Does this packet carry a different pattern than we're currently showing?
-    // Rejecting a *duplicate* (same pattern) happens constantly in steady state
-    // and is noise; rejecting a *differing* pattern means either this scarf or
-    // the sender is out of step, and is worth shouting about.
-    const bool patternDiffers = _patternManager->getCurrentPattern() != pkt.pattern;
-
-    if (!shouldAcceptUpdate(pkt.changeIndex, _sync.changeIndex))
-    {
-        if (patternDiffers)
+    const std::string currentPattern = _patternManager->getCurrentPattern();
+    switch (classifyUpdate(pkt, _sync, currentPattern.c_str())) {
+        case UpdateDecision::Accept:
+            break;
+        case UpdateDecision::Ignore:
+            return;
+        case UpdateDecision::RejectDiffering:
             Scarfnet::log("[SCARF][RCV] STUCK? rejected differing pattern=%s from node %u — "
                           "incoming ci=%u <= local ci=%u (local pattern=%s)",
                           pkt.pattern, pkt.id, pkt.changeIndex, _sync.changeIndex,
-                          _patternManager->getCurrentPattern().c_str());
-        return;
+                          currentPattern.c_str());
+            return;
     }
 
     Scarfnet::log("[SCARF][RCV] accepting pattern=%s randomizer=%u ci=%u from node %u",
@@ -145,8 +123,7 @@ void Scarf::onReceived(const HeartbeatPacket& pkt)
         // later heartbeat retries (and re-flashes red) until a known pattern wins.
         Scarfnet::log("[SCARF][RCV] REJECTED unknown pattern=%s from node %u ver=%u (ours ver=%u)",
                       pkt.pattern, pkt.id, pkt.version, kScarfVersion);
-        _unknownPatternFlashStartMs = millis();
-        _unknownPatternFlashActive  = true;
+        _unknownPatternAlarm.trigger(millis());
         return;
     }
 
@@ -238,8 +215,7 @@ void Scarf::processEvent(const ObservableButton::Event& event)
         case ObservableButton::Event::eDown:
         {
             if (_tapTempoMode) {
-                _lastLocalTapMs = _mesh->timeMs();
-                _tapTempo.tap(_lastLocalTapMs);
+                _tapTempo.tap(_mesh->timeMs());
                 Scarfnet::log("eDown (tap-tempo) interval=%ums active=%d",
                     _tapTempo.beatIntervalMs(), (int)_tapTempo.isActive());
                 _taskSendMessage.forceNextIteration();
@@ -323,44 +299,19 @@ void Scarf::updateTime()
 
 void Scarf::showBuiltInLED()
 {
-    // Unknown-pattern alarm: rapid red flashes override every other indicator.
-    // Uses local millis() so a mesh clock jump can't stretch or cut it short.
-    bool alarmOn = false;
-    if (_unknownPatternFlashActive) {
-        uint32_t elapsed = millis() - _unknownPatternFlashStartMs;
-        if (elapsed < kUnknownPatternFlashCount * 2 * kUnknownPatternFlashHalfPeriodMs)
-            alarmOn = (elapsed / kUnknownPatternFlashHalfPeriodMs) % 2 == 0;
-        else
-            _unknownPatternFlashActive = false;
-    }
-
-    for (int i = 0; i < (int)_builtinLED.size(); ++i)
-    {
-        _builtinLED[i] = CRGB::Black;
-
-        if (_unknownPatternFlashActive) {
-            if (alarmOn) _builtinLED[i] = CRGB::Red;
-        } else if (_tapTempoMode) {
-            // Dim green idle glow indicates tap-tempo mode is active.
-            _builtinLED[i] = CRGB(0, 5, 0);
-
-            if (_tapTempo.isActive()) {
-                // Bright green pulse at the beat rate — confirms tempo is locked.
-                uint16_t phase    = _tapTempo.beatPhaseMs(_timeMsec);
-                uint16_t interval = _tapTempo.beatIntervalMs();
-                if (interval > 0 && phase < interval / 10)  // ~10% duty cycle
-                    _builtinLED[i] = CRGB::Green;
-            }
-        } else {
-            // Sync blink: brief flash on a shared period so all scarves pulse together.
-            // Blue = normal; Red = a peer with newer firmware is on the network.
-            float    floatTime = _timeMsec / (float)kSyncBlinkPeriodMs;
-            uint32_t intTime   = _timeMsec / kSyncBlinkPeriodMs;
-            constexpr float kDutyCycle = 0.05f;
-            if ((floatTime - (float)intTime) < kDutyCycle)
-                _builtinLED[i] = _newerVersionSeen ? CRGB::Red : CRGB::Blue;
-        }
-    }
+    uint32_t now = millis();
+    IndicatorState state {
+        .alarmActive      = _unknownPatternAlarm.isActive(now),
+        .alarmOn          = _unknownPatternAlarm.isOn(now),
+        .tapTempoMode     = _tapTempoMode,
+        .tempoActive      = _tapTempo.isActive(),
+        .beatIntervalMs   = _tapTempo.beatIntervalMs(),
+        .beatPhaseMs      = _tapTempo.beatPhaseMs(_timeMsec),
+        .meshTimeMs       = _timeMsec,
+        .newerVersionSeen = _newerVersionSeen,
+    };
+    CRGB color = builtinLedColor(state);
+    for (auto& led : _builtinLED) led = color;
 }
 
 void Scarf::showLEDs()

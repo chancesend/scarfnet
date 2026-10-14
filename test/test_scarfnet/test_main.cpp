@@ -1,6 +1,7 @@
 #include <unity.h>
 
 #include "beat_info/test_beat_info.h"
+#include "builtin_led/test_builtin_led.h"
 #include "clock_sync/test_clock_sync.h"
 #include "heartbeat_framer/test_heartbeat_framer.h"
 #include "mesh/test_mesh.h"
@@ -11,6 +12,7 @@
 #include "swarm/test_swarm_ema.h"
 #include "sync/test_sync.h"
 #include "tap_tempo/test_tap_tempo.h"
+#include "transition/test_transition.h"
 
 void setUp(void) {
     // set stuff up here
@@ -29,6 +31,7 @@ int main( int argc, char **argv) {
 
     RUN_TEST(test_simple);
     beat_info_tests();
+    builtin_led_tests();
     clock_sync_tests();
     heartbeat_framer_tests();
     node_tracker_tests();
@@ -39,6 +42,7 @@ int main( int argc, char **argv) {
     swarm_ema_tests();
     sync_tests();
     tap_tempo_tests();
+    transition_tests();
     
     UNITY_END();
 }

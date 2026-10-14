@@ -58,6 +58,9 @@ const bool  kTapTempoOnLongPress          = true;
 // Taps whose implied BPM falls outside this range are ignored.
 const float kTapMinBpm                    = 30.0f;
 const float kTapMaxBpm                    = 300.0f;
+// A tap gap longer than this resets the tap sequence (user stopped tapping).
+// Also the window during which a tapping scarf ignores peers' tempo.
+const uint32_t kTapMaxGapMs               = 3000;
 
 // ── ESP-NOW ───────────────────────────────────────────────────────────────────
 // All scarves must use the same channel. Channel 6 avoids overlap with channels

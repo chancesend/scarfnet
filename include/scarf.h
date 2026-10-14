@@ -3,6 +3,7 @@
 #include "defines.h"
 #include "sync.h"
 #include "sync_state.h"
+#include "builtin_led.h"
 #include "Mesh.h"
 #include "ObservableButton.h"
 #include "OtaManager.h"
@@ -68,12 +69,10 @@ private:
 
     TapTempo _tapTempo;
     bool     _tapTempoMode     {false};  // true = long-press entered tap-tempo input mode
-    TimeMs   _lastLocalTapMs   {0};     // mesh time of the most recent local tap
     bool     _newerVersionSeen {false};  // true if any peer has a higher firmware version
-    // Set when a peer tells us to switch to a pattern we don't have; drives a
-    // burst of red flashes on the built-in LED. Start time is local millis().
-    bool     _unknownPatternFlashActive  {false};
-    uint32_t _unknownPatternFlashStartMs {0};
+    // Triggered when a peer tells us to switch to a pattern we don't have;
+    // flashes the built-in LED red. Timed on local millis().
+    FlashBurst _unknownPatternAlarm {kUnknownPatternFlashCount, kUnknownPatternFlashHalfPeriodMs};
 
     NodeFlash _nodeFlashes[kMaxNodeFlashes] {};
     int       _nodeFlashCount {0};

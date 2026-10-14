@@ -35,37 +35,25 @@ void PatternManager::runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const Beat
     ctx.flashCount  = nodeInfo.flashCount;
     for (int i = 0; i < nodeInfo.flashCount; i++) ctx.recentFlashes[i] = nodeInfo.flashes[i];
 
-    // Capture transition start on the first render call after a pattern change.
-    if (_transitionPending) {
-        _transitionStartMs = nodeTimeMs;
-        _transitionPending = false;
-    }
-
     // Cross-fade: blend outgoing pattern into incoming over kPatternTransitionMs.
-    if (_transitionStartMs > 0) {
-        TimeMs elapsed = nodeTimeMs - _transitionStartMs;
+    uint8_t blendAmt;
+    if (_patternFade.step(nodeTimeMs, blendAmt)) {
+        // Render outgoing pattern into a scratch buffer.
+        Leds prevLeds(leds.size(), CRGB::Black);
+        PatternContext prevCtx  = ctx;
+        prevCtx.rnd      = _previousRandomizer;
+        prevCtx.localRnd = _previousLocalRnd;
+        _previousPattern->second(prevLeds, prevCtx);
 
-        if (elapsed < (TimeMs)kPatternTransitionMs) {
-            // Render outgoing pattern into a scratch buffer.
-            Leds prevLeds(leds.size(), CRGB::Black);
-            PatternContext prevCtx  = ctx;
-            prevCtx.rnd      = _previousRandomizer;
-            prevCtx.localRnd = _previousLocalRnd;
-            _previousPattern->second(prevLeds, prevCtx);
+        // Render incoming pattern into leds.
+        ctx.rnd      = _currentRandomizer;
+        ctx.localRnd = _localRnd;
+        _currentPattern->second(leds, ctx);
 
-            // Render incoming pattern into leds.
-            ctx.rnd      = _currentRandomizer;
-            ctx.localRnd = _localRnd;
-            _currentPattern->second(leds, ctx);
-
-            // Blend: 0 = all outgoing, 255 = all incoming.
-            uint8_t blendAmt = (uint8_t)(elapsed * 255u / kPatternTransitionMs);
-            for (size_t i = 0; i < leds.size(); ++i)
-                leds[i] = blend(prevLeds[i], leds[i], blendAmt);
-            return;
-        }
-
-        _transitionStartMs = 0;  // transition complete
+        // Blend: 0 = all outgoing, 255 = all incoming.
+        for (size_t i = 0; i < leds.size(); ++i)
+            leds[i] = blend(prevLeds[i], leds[i], blendAmt);
+        return;
     }
 
     ctx.rnd      = _currentRandomizer;
@@ -129,10 +117,10 @@ bool PatternManager::changePatternFromString(const std::string &pattern, Rnd ran
         _previousPattern    = _currentPattern;
         _previousRandomizer = _currentRandomizer;
         _previousLocalRnd   = _localRnd;
-        _transitionPending  = true;
+        _patternFade.begin();
 
         _prevPalette    = _currentPalette;
-        _palettePending = true;
+        _paletteFade.begin();
 
         _currentPattern    = found;
         _currentRandomizer = randomizer;
@@ -152,22 +140,13 @@ bool PatternManager::changePatternFromString(const std::string &pattern, Rnd ran
 
 void PatternManager::blendPalette(TimeMs nodeTimeMs)
 {
-    if (_palettePending) {
-        _paletteStartMs = nodeTimeMs;
-        _palettePending = false;
-    }
-
-    if (_paletteStartMs == 0) return;
-
-    TimeMs elapsed = nodeTimeMs - _paletteStartMs;
-    if (elapsed >= (TimeMs)kPaletteTransitionMs) {
-        _currentPalette = _targetPalette;
-        _paletteStartMs = 0;
+    uint8_t amt;
+    if (!_paletteFade.step(nodeTimeMs, amt)) {
+        _currentPalette = _targetPalette;  // finished (or idle): settle on target
         return;
     }
 
     // Direct time-based lerp across all 48 palette bytes.
-    uint8_t amt  = (uint8_t)(elapsed * 255u / kPaletteTransitionMs);
     uint8_t* cur  = (uint8_t*)&_currentPalette;
     uint8_t* prev = (uint8_t*)&_prevPalette;
     uint8_t* tgt  = (uint8_t*)&_targetPalette;

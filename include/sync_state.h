@@ -10,6 +10,8 @@
 #include "heartbeat_packet.h"
 #include "sync.h"
 
+#include <string.h>
+
 namespace Scarfnet {
 
 struct SyncState {
@@ -27,7 +29,24 @@ inline void writeSyncState(HeartbeatPacket& pkt, const SyncState& state)
     pkt.globalRandomizer = state.randomizer;
 }
 
-// Call only after shouldAcceptUpdate() passed and the pattern was applied.
+enum class UpdateDecision : uint8_t {
+    Accept,           // newer state: apply the pattern, then adoptSyncState()
+    Ignore,           // not newer, same pattern: steady-state duplicate, silent
+    RejectDiffering,  // not newer, different pattern: this scarf or the sender
+                      // is out of step — the field "stuck scarf" signature
+};
+
+// What to do with an incoming heartbeat, given our state and current pattern.
+inline UpdateDecision classifyUpdate(const HeartbeatPacket& pkt, const SyncState& local,
+                                     const char* currentPattern)
+{
+    if (shouldAcceptUpdate(pkt.changeIndex, local.changeIndex))
+        return UpdateDecision::Accept;
+    bool samePattern = strncmp(pkt.pattern, currentPattern, sizeof(pkt.pattern)) == 0;
+    return samePattern ? UpdateDecision::Ignore : UpdateDecision::RejectDiffering;
+}
+
+// Call only after classifyUpdate() returned Accept and the pattern was applied.
 inline void adoptSyncState(SyncState& state, const HeartbeatPacket& pkt)
 {
     state.changeIndex = rolloverGuard(pkt.changeIndex);

@@ -1,6 +1,10 @@
 #include <unity.h>
 #include <sync.h>
 #include <sync_state.h>
+#include <heartbeat_builder.h>
+
+#include <string.h>
+#include <string>
 
 // ---------------------------------------------------------------------------
 // shouldAcceptUpdate
@@ -155,6 +159,82 @@ void test_sync_relayed_update_carries_pressers_randomizer()
                                                    missed.state.changeIndex));
 }
 
+// ---------------------------------------------------------------------------
+// classifyUpdate: what onReceived does with a heartbeat
+// ---------------------------------------------------------------------------
+
+static Scarfnet::HeartbeatPacket packetWith(Scarfnet::ChangeIndex ci, const char* pattern)
+{
+    Scarfnet::HeartbeatPacket pkt = {};
+    pkt.changeIndex = ci;
+    Scarfnet::setPatternName(pkt, pattern);
+    return pkt;
+}
+
+void test_classify_newer_index_accepted()
+{
+    Scarfnet::SyncState local = {5, 0, 0, 0};
+    TEST_ASSERT_TRUE(Scarfnet::classifyUpdate(packetWith(6, "fractal"), local, "cylon")
+                     == Scarfnet::UpdateDecision::Accept);
+}
+
+void test_classify_same_index_same_pattern_ignored()
+{
+    Scarfnet::SyncState local = {5, 0, 0, 0};
+    TEST_ASSERT_TRUE(Scarfnet::classifyUpdate(packetWith(5, "cylon"), local, "cylon")
+                     == Scarfnet::UpdateDecision::Ignore);
+}
+
+void test_classify_same_index_different_pattern_rejected_differing()
+{
+    // Equal-index tie: two scarves disagree and neither can win — stuck.
+    Scarfnet::SyncState local = {5, 0, 0, 0};
+    TEST_ASSERT_TRUE(Scarfnet::classifyUpdate(packetWith(5, "fractal"), local, "cylon")
+                     == Scarfnet::UpdateDecision::RejectDiffering);
+}
+
+void test_classify_older_index_different_pattern_rejected_differing()
+{
+    // A lagging sender: we're ahead, it's the stuck one.
+    Scarfnet::SyncState local = {5, 0, 0, 0};
+    TEST_ASSERT_TRUE(Scarfnet::classifyUpdate(packetWith(4, "fractal"), local, "cylon")
+                     == Scarfnet::UpdateDecision::RejectDiffering);
+}
+
+// ---------------------------------------------------------------------------
+// buildHeartbeat / setPatternName
+// ---------------------------------------------------------------------------
+
+void test_build_heartbeat_fills_all_fields()
+{
+    Scarfnet::TapTempo tempo;
+    tempo.setFromPacket(500, 10000, 100);  // last beat at 9900
+    Scarfnet::SyncState sync = {6, 5000, 42, 0xBEEF};
+
+    Scarfnet::HeartbeatPacket pkt =
+        Scarfnet::buildHeartbeat(7, 10200, sync, "fractal", tempo);
+
+    TEST_ASSERT_EQUAL_UINT32(7u, pkt.id);
+    TEST_ASSERT_EQUAL_UINT16(kScarfVersion, pkt.version);
+    TEST_ASSERT_EQUAL_UINT32(10200u, pkt.currentTimeMs);
+    TEST_ASSERT_EQUAL_UINT32(6u, pkt.changeIndex);
+    TEST_ASSERT_EQUAL_UINT32(5000u, pkt.lastPressMs);
+    TEST_ASSERT_EQUAL_UINT32(42u, pkt.lastPressId);
+    TEST_ASSERT_EQUAL_HEX16(0xBEEF, pkt.globalRandomizer);
+    TEST_ASSERT_EQUAL_STRING("fractal", pkt.pattern);
+    TEST_ASSERT_EQUAL_UINT16(500, pkt.beatIntervalMs);
+    TEST_ASSERT_EQUAL_UINT16(300, pkt.beatPhaseMs);  // (10200 - 9900) % 500
+}
+
+void test_set_pattern_name_truncates_and_terminates()
+{
+    Scarfnet::HeartbeatPacket pkt = {};
+    memset(pkt.pattern, 'x', sizeof(pkt.pattern));
+    Scarfnet::setPatternName(pkt, std::string(40, 'a'));
+    TEST_ASSERT_EQUAL_size_t(31, strlen(pkt.pattern));
+    TEST_ASSERT_EQUAL_CHAR('\0', pkt.pattern[31]);
+}
+
 void sync_tests()
 {
     RUN_TEST(test_sync_accept_newer_index);
@@ -170,4 +250,10 @@ void sync_tests()
     RUN_TEST(test_sync_duplicate_messages_ignored);
     RUN_TEST(test_sync_state_round_trips_through_packet);
     RUN_TEST(test_sync_relayed_update_carries_pressers_randomizer);
+    RUN_TEST(test_classify_newer_index_accepted);
+    RUN_TEST(test_classify_same_index_same_pattern_ignored);
+    RUN_TEST(test_classify_same_index_different_pattern_rejected_differing);
+    RUN_TEST(test_classify_older_index_different_pattern_rejected_differing);
+    RUN_TEST(test_build_heartbeat_fills_all_fields);
+    RUN_TEST(test_set_pattern_name_truncates_and_terminates);
 }

@@ -7,6 +7,10 @@
 #include "mesh_types.h"  // NodeId, TimeMs
 #include "sync.h"        // ChangeIndex
 
+#include <cstddef>
+#include <cstring>
+#include <string>
+
 namespace Scarfnet {
 
 // Packed heartbeat broadcast over ESP-NOW. Well under the 250-byte limit.
@@ -50,5 +54,13 @@ struct __attribute__((packed)) HeartbeatPacket {
 };
 static_assert(sizeof(HeartbeatPacket) <= 250, "HeartbeatPacket exceeds ESP-NOW 250-byte limit");
 static_assert(offsetof(HeartbeatPacket, pattern) == 32, "pattern must start at offset 32");
+
+// Copies `name` into pkt.pattern, truncating to 31 chars; always null-terminated.
+inline void setPatternName(HeartbeatPacket& pkt, const std::string& name)
+{
+    size_t len = name.size() < sizeof(pkt.pattern) - 1 ? name.size() : sizeof(pkt.pattern) - 1;
+    memcpy(pkt.pattern, name.c_str(), len);
+    pkt.pattern[len] = '\0';
+}
 
 } // namespace Scarfnet
