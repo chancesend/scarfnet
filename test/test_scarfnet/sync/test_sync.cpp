@@ -1,5 +1,6 @@
 #include <unity.h>
 #include <sync.h>
+#include <sync_state.h>
 
 // ---------------------------------------------------------------------------
 // shouldAcceptUpdate
@@ -92,6 +93,68 @@ void test_sync_duplicate_messages_ignored()
     TEST_ASSERT_FALSE(Scarfnet::shouldAcceptUpdate(7, local));
 }
 
+// ---------------------------------------------------------------------------
+// Relay round-trip: a scarf that misses the press and hears it second-hand must
+// end up with the presser's full state, not the relayer's.
+// ---------------------------------------------------------------------------
+
+// Minimal model of Scarf's send/receive path for the replicated state.
+struct RelayNode
+{
+    Scarfnet::SyncState state;
+
+    Scarfnet::HeartbeatPacket heartbeat() const
+    {
+        Scarfnet::HeartbeatPacket pkt = {};
+        Scarfnet::writeSyncState(pkt, state);
+        return pkt;
+    }
+
+    void receive(const Scarfnet::HeartbeatPacket& pkt)
+    {
+        if (Scarfnet::shouldAcceptUpdate(pkt.changeIndex, state.changeIndex))
+            Scarfnet::adoptSyncState(state, pkt);
+    }
+};
+
+void test_sync_state_round_trips_through_packet()
+{
+    Scarfnet::SyncState in = {6, 5000, 42, 0xBEEF};
+    Scarfnet::HeartbeatPacket pkt = {};
+    Scarfnet::writeSyncState(pkt, in);
+
+    Scarfnet::SyncState out = {};
+    Scarfnet::adoptSyncState(out, pkt);
+    TEST_ASSERT_EQUAL_UINT32(6u, out.changeIndex);
+    TEST_ASSERT_EQUAL_UINT32(5000u, out.lastPressMs);
+    TEST_ASSERT_EQUAL_UINT32(42u, out.lastPressId);
+    TEST_ASSERT_EQUAL_HEX16(0xBEEF, out.randomizer);
+}
+
+void test_sync_relayed_update_carries_pressers_randomizer()
+{
+    // All three synced at ci=5. B has never pressed, so its randomizer is 0.
+    RelayNode presser{{5, 1000, 1, 0x1111}};
+    RelayNode relay  {{5, 1000, 1, 0x0000}};
+    RelayNode missed {{5, 1000, 1, 0x1111}};
+
+    // Presser presses: new randomizer, ci=6.
+    presser.state = {6, 5000, 1, 0xBEEF};
+
+    // Relay hears the press directly; missed is out of range.
+    relay.receive(presser.heartbeat());
+
+    // Missed comes back and hears the relay's heartbeat first.
+    missed.receive(relay.heartbeat());
+    TEST_ASSERT_EQUAL_UINT32(6u, missed.state.changeIndex);
+    TEST_ASSERT_EQUAL_HEX16(0xBEEF, missed.state.randomizer);
+
+    // Equal ci: the presser's own later heartbeats can't correct a mismatch,
+    // which is why it would otherwise persist until the next press.
+    TEST_ASSERT_FALSE(Scarfnet::shouldAcceptUpdate(presser.heartbeat().changeIndex,
+                                                   missed.state.changeIndex));
+}
+
 void sync_tests()
 {
     RUN_TEST(test_sync_accept_newer_index);
@@ -105,4 +168,6 @@ void sync_tests()
     RUN_TEST(test_rollover_guard_resets_max_uint32);
     RUN_TEST(test_sync_out_of_order_messages_do_not_regress);
     RUN_TEST(test_sync_duplicate_messages_ignored);
+    RUN_TEST(test_sync_state_round_trips_through_packet);
+    RUN_TEST(test_sync_relayed_update_carries_pressers_randomizer);
 }

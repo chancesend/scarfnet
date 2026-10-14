@@ -7,7 +7,7 @@
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
 // Version 100 = 1.00, version 102 = 1.02, etc
-const uint16_t kScarfVersion              = 106;
+const uint16_t kScarfVersion              = 108;
 
 // ── ObservableButton ─────────────────────────────────────────────────────────
 const uint32_t kButtonPollIntervalMs       = 50;
@@ -34,6 +34,22 @@ const uint32_t kSyncBlinkPeriodMs         = 5000;
 // kBurstSyncIntervalMs so the joining node converges pattern and clock quickly.
 const uint32_t kBurstSyncIntervalMs       = 500;
 const int      kBurstSyncCount            = 3;
+
+// ── Scarf: epidemic re-broadcast on accept ───────────────────────────────────
+// When a scarf accepts a new pattern (from a button press elsewhere), it
+// immediately re-broadcasts so the update floods the network in one hop per
+// node instead of trickling at the heartbeat cadence. A duplicate fails the
+// sync check on arrival, so each node re-emits at most once per update — no
+// storm. The re-broadcast is delayed by a random 0..kRebroadcastJitterMs so all
+// nodes don't transmit simultaneously and overflow the 8-slot rx queue.
+const uint32_t kRebroadcastJitterMs       = 250;
+
+// ── Scarf: unknown-pattern alarm ─────────────────────────────────────────────
+// When a peer tells this scarf to switch to a pattern it doesn't have (firmware
+// mismatch), the built-in LED flashes red kUnknownPatternFlashCount times.
+// Retriggers on every such packet, so a stuck scarf keeps flashing.
+const uint32_t kUnknownPatternFlashCount        = 4;
+const uint32_t kUnknownPatternFlashHalfPeriodMs = 80;
 
 // ── Tap-tempo ────────────────────────────────────────────────────────────────
 // Set true  → long press toggles tap-tempo mode (short press feeds the beat).

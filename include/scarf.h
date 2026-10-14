@@ -2,6 +2,7 @@
 
 #include "defines.h"
 #include "sync.h"
+#include "sync_state.h"
 #include "Mesh.h"
 #include "ObservableButton.h"
 #include "OtaManager.h"
@@ -63,14 +64,16 @@ private:
     Mesh::TimeMs _timeMsec                  {0};
 
     ObservableButton _nextPatternButton;
-    Mesh::TimeMs     _lastSelfButtonPressMs {0};
-    Mesh::NodeId     _lastPressId           {0};  // node that last changed the pattern
     bool             _onFlag        {false};
 
     TapTempo _tapTempo;
     bool     _tapTempoMode     {false};  // true = long-press entered tap-tempo input mode
+    TimeMs   _lastLocalTapMs   {0};     // mesh time of the most recent local tap
     bool     _newerVersionSeen {false};  // true if any peer has a higher firmware version
-    Rnd      _globalRandomizer {0};      // random seed broadcast with each pattern change
+    // Set when a peer tells us to switch to a pattern we don't have; drives a
+    // burst of red flashes on the built-in LED. Start time is local millis().
+    bool     _unknownPatternFlashActive  {false};
+    uint32_t _unknownPatternFlashStartMs {0};
 
     NodeFlash _nodeFlashes[kMaxNodeFlashes] {};
     int       _nodeFlashCount {0};
@@ -83,8 +86,14 @@ private:
     // Fires kBurstSyncCount times at kBurstSyncIntervalMs after a node joins,
     // so the new peer converges pattern and clock quickly.
     Task _taskBurstSync;
+    // One-shot: re-broadcasts a freshly accepted update after a short random
+    // delay so the change floods epidemically instead of trickling. See
+    // kRebroadcastJitterMs.
+    Task _taskRebroadcast;
 
-    ChangeIndex _changeIndex {0};
+    // Replicated pattern-change state (changeIndex, last press, randomizer)
+    // carried in every heartbeat. See sync_state.h.
+    SyncState _sync {};
 
     Leds _ledsReal;
     Leds _builtinLED;
