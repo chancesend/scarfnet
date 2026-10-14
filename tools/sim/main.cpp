@@ -199,8 +199,8 @@ int main()
         // ── Simulate ───────────────────────────────────────────────────────────
         BeatInfo beat = tapTempo.beatInfo(now);
 
-        if (now - lastBlendMs >= 20) {
-            for (auto* s : scarves) s->pm.blendPalette();
+        if (now - lastBlendMs >= (TimeMs)kPaletteBlendRateMs) {
+            for (auto* s : scarves) s->pm.blendPalette(now);
             lastBlendMs = now;
         }
 
