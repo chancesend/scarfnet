@@ -41,76 +41,45 @@ void test_cylon_gradient_distinct_lumas_at_center_led() {
         "Too few distinct luma values at LED 12 — beam falloff may be quantized");
 }
 
-// ─── No brightness spikes ─────────────────────────────────────────────────────
+// ─── Beam falloff profile ─────────────────────────────────────────────────────
 
-// For every frame in a full period sweep, no interior LED should have
-// significantly higher luma than both its neighbours.  Such a spike is the
-// specific artifact produced by the uint8_t truncation overflow in the old
-// quadratic falloff: (uint8_t)(edgeFrac16² >> 16) wraps for mid-beam
-// distances (e.g. edgeFrac16=32768 → result 16384 → uint8_t=0 → fade=255).
-void test_cylon_no_brightness_spikes() {
-    for (int32_t t = 0; t < 4000; t += 2) {
-        Leds leds = makeLeds();
-        cylon(leds, makeCylonCtx(t));
+// The falloff is tested directly rather than inferred from rendered frames:
+// cylon draws two beams with different widths, hues, and an accent-blended
+// core, so whole-frame luma checks can't tell a falloff bug from the design.
+//
+// Guards the old uint8_t truncation overflow, which wrapped mid-beam distances
+// to fade=255 — a bright spike inside an otherwise falling profile. Sweeps every
+// half-width the pattern can produce (1..8 px) at full fixed-point resolution.
+void test_cylon_beam_fade_full_at_center_zero_at_edge() {
+    for (int32_t hw = 256; hw <= 8 * 256; hw += 256) {
+        TEST_ASSERT_EQUAL_UINT8(255, cylonBeamFade(0, hw));
+        TEST_ASSERT_EQUAL_UINT8(0, cylonBeamFade(hw, hw));
+    }
+}
 
-        for (int i = 1; i < kNumLeds - 1; ++i) {
-            int diffPrev = (int)leds[i].getLuma() - (int)leds[i-1].getLuma();
-            int diffNext = (int)leds[i].getLuma() - (int)leds[i+1].getLuma();
-            bool spike   = leds[i].getLuma() > 50 && diffPrev > 40 && diffNext > 40;
-            TEST_ASSERT_FALSE_MESSAGE(spike,
-                "Brightness spike: interior LED much brighter than both neighbours");
+void test_cylon_beam_fade_monotonic_from_center() {
+    for (int32_t hw = 256; hw <= 8 * 256; hw += 256) {
+        uint8_t prev = cylonBeamFade(0, hw);
+        for (int32_t d = 1; d <= hw; ++d) {
+            uint8_t fade = cylonBeamFade(d, hw);
+            TEST_ASSERT_TRUE_MESSAGE(fade <= prev,
+                "Beam fade increased moving away from center (falloff overflow)");
+            prev = fade;
         }
     }
 }
 
-// ─── Monotonicity from peak ───────────────────────────────────────────────────
-
-// When exactly one beam peak is visible in the interior of the strip, luma
-// must be non-increasing in both directions from that peak — a correct
-// quadratic beam profile has no reversals within its span.  Frames where
-// both beams overlap (two interior peaks) are skipped so the check is never
-// confused by additive blending of two independent beams.
-void test_cylon_beam_monotonic_from_peak() {
-    int framesChecked = 0;
-
-    for (int32_t t = 0; t < 4000; t += 2) {
-        Leds leds = makeLeds();
-        cylon(leds, makeCylonCtx(t));
-
-        // Find interior local maxima: brighter than both neighbours, above threshold
-        int peakPos = -1, peakCount = 0;
-        for (int i = 2; i < kNumLeds - 2; ++i) {
-            uint8_t l = leds[i].getLuma();
-            if (l > 30 && l > leds[i-1].getLuma() && l > leds[i+1].getLuma()) {
-                peakPos = i;
-                peakCount++;
-            }
-        }
-        if (peakCount != 1) continue;  // skip overlap frames and edge-beam frames
-        framesChecked++;
-
-        // Check 3 LED steps outward on each side.  With rnd=0, b1HalfWFP=2px
-        // so 3 steps covers the full beam span including the fade-to-zero edge.
-        for (int s = 0; s < 3 && peakPos + s < kNumLeds - 1; ++s) {
-            TEST_ASSERT_TRUE_MESSAGE(
-                leds[peakPos + s].getLuma() >= leds[peakPos + s + 1].getLuma(),
-                "Luma increased moving right from beam peak (non-monotonic falloff)");
-        }
-        for (int s = 0; s < 3 && peakPos - s > 0; ++s) {
-            TEST_ASSERT_TRUE_MESSAGE(
-                leds[peakPos - s].getLuma() >= leds[peakPos - s - 1].getLuma(),
-                "Luma increased moving left from beam peak (non-monotonic falloff)");
-        }
-    }
-
-    TEST_ASSERT_TRUE_MESSAGE(framesChecked > 0,
-        "No single-peak frames found — increase sweep range or lower threshold");
+void test_cylon_beam_fade_is_quadratic() {
+    // Halfway out, a quadratic falloff is at 3/4 brightness: 255 * 0.75 = 191.
+    TEST_ASSERT_EQUAL_UINT8(191, cylonBeamFade(256, 512));
+    TEST_ASSERT_EQUAL_UINT8(191, cylonBeamFade(1024, 2048));
 }
 
 // ---------------------------------------------------------------------------
 
 void cylon_tests() {
     RUN_TEST(test_cylon_gradient_distinct_lumas_at_center_led);
-    RUN_TEST(test_cylon_no_brightness_spikes);
-    RUN_TEST(test_cylon_beam_monotonic_from_peak);
+    RUN_TEST(test_cylon_beam_fade_full_at_center_zero_at_edge);
+    RUN_TEST(test_cylon_beam_fade_monotonic_from_center);
+    RUN_TEST(test_cylon_beam_fade_is_quadratic);
 }

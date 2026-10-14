@@ -15,6 +15,16 @@ namespace Scarfnet {
 // Drift is suppressed in beat mode so the beams track their locked periods cleanly.
 // Per-device localRnd phase offsets (up to 1/4 period) remain active in all modes.
 
+// Quadratic beam falloff: 255 at the center, 0 at the edge. `distFP` and
+// `halfWFP` are 8.8 fixed point pixels, distFP <= halfWFP. Computed entirely in
+// 32-bit (fade = 255*(hw²-d²)/hw²) to avoid the old uint8_t truncation bug that
+// caused bright spikes mid-beam.
+inline uint8_t cylonBeamFade(int32_t distFP, int32_t halfWFP)
+{
+    const uint32_t hwSq = (uint32_t)halfWFP * (uint32_t)halfWFP;
+    return (uint8_t)(255u * (hwSq - (uint32_t)distFP * (uint32_t)distFP) / hwSq);
+}
+
 void cylon(Leds& leds, const PatternContext& ctx)
 {
     const uint32_t tMs = (uint32_t)ctx.timeMs;  // always-positive; safe past INT32_MAX
@@ -91,11 +101,7 @@ void cylon(Leds& leds, const PatternContext& ctx)
         // Beam 1
         const int32_t dist1 = abs(iFP - (int32_t)center1FP);
         if (dist1 <= b1HalfWFP) {
-            // Quadratic falloff computed entirely in 32-bit: fade = 255*(hw²-d²)/hw²
-            // avoids the uint8_t truncation bug that caused bright spikes mid-beam.
-            const uint32_t hw1sq = (uint32_t)b1HalfWFP * (uint32_t)b1HalfWFP;
-            uint8_t fade   = (uint8_t)(255u * (hw1sq - (uint32_t)dist1 * (uint32_t)dist1) / hw1sq);
-            CRGB c = ColorFromPalette(ctx.palette, hue1, fade, LINEARBLEND);
+            CRGB c = ColorFromPalette(ctx.palette, hue1, cylonBeamFade(dist1, b1HalfWFP), LINEARBLEND);
             // Accent color peeks through at the beam core
             uint8_t secAmt = (uint8_t)((uint32_t)kSecColorMaxAmt * (uint32_t)(b1HalfWFP - dist1) / (uint32_t)b1HalfWFP);
             CRGB accent = ColorFromPalette(ctx.palette, secondaryHue, 255, LINEARBLEND);
@@ -105,9 +111,7 @@ void cylon(Leds& leds, const PatternContext& ctx)
         // Beam 2
         const int32_t dist2 = abs(iFP - (int32_t)center2FP);
         if (dist2 <= b2HalfWFP) {
-            const uint32_t hw2sq = (uint32_t)b2HalfWFP * (uint32_t)b2HalfWFP;
-            uint8_t fade   = (uint8_t)(255u * (hw2sq - (uint32_t)dist2 * (uint32_t)dist2) / hw2sq);
-            pixel += ColorFromPalette(ctx.palette, hue2, fade, LINEARBLEND);
+            pixel += ColorFromPalette(ctx.palette, hue2, cylonBeamFade(dist2, b2HalfWFP), LINEARBLEND);
         }
 
         leds[i] = pixel;
