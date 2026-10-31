@@ -138,8 +138,9 @@ void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
     bool isNew = _tracker.saw(nodeId, now);
     updateClock(pkt.currentTimeMs);
 
-    Scarfnet::log("[MESH][RCV node %u] pattern=%s ci=%u peerTime=%u myTime=%u",
-                  nodeId, pkt.pattern, pkt.changeIndex, pkt.currentTimeMs, timeMs());
+    Scarfnet::log("[MESH][RCV node %u] ver=%u pattern=%s ci=%u rnd=%u peerTime=%u myTime=%u",
+                  nodeId, pkt.version, pkt.pattern, pkt.changeIndex, pkt.globalRandomizer,
+                  pkt.currentTimeMs, timeMs());
 
     if (isNew) {
         Scarfnet::log("[MESH] node %u joined (peers: %u)", nodeId, (unsigned)_tracker.count());
