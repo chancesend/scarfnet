@@ -168,7 +168,7 @@ bool OtaManager::computeFirmwareInfo()
     MD5Builder md5;
     md5.begin();
 
-    uint8_t buf[kOtaFlashChunkBytes];
+    static uint8_t buf[kOtaFlashChunkBytes];  // static: too big for the loop stack
     size_t remaining = _firmwareSize;
     size_t offset    = 0;
     while (remaining > 0)
@@ -264,7 +264,7 @@ void OtaManager::handleFirmwareRequest()
     // connected while every write blocks and fails. Stop on the first short
     // write, and cap the whole transfer, so one bad client can't hang the
     // server for everyone else.
-    uint8_t  buf[kOtaFlashChunkBytes];
+    static uint8_t buf[kOtaFlashChunkBytes];  // static: too big for the loop stack
     size_t   remaining = _firmwareSize;
     size_t   offset    = 0;
     uint32_t start     = millis();
@@ -303,7 +303,11 @@ void OtaManager::receiverLoop()
 
     _ledSetter(CRGB(255, 80, 0)); // solid orange during scan
     Scarfnet::log("[OTA] Scanning for OTA server AP...");
-    int found = WiFi.scanNetworks(); // synchronous; blocks ~2 s
+    // An auto-started receiver knows the server is on the mesh channel, so it
+    // scans just that channel (~150 ms) instead of all of them (~2 s).
+    int found = _autoMode
+        ? WiFi.scanNetworks(false, false, false, kOtaAutoScanDwellMs, kEspNowChannel)
+        : WiFi.scanNetworks();  // synchronous; blocks ~2 s
     _ledSetter(CRGB::Black);
 
     for (int i = 0; i < found; i++)
@@ -383,6 +387,7 @@ bool OtaManager::fetchFirmwareInfo(const String& base, int& serverVersion, size_
 {
     HTTPClient http;
     http.begin(base + "/info");
+    http.setTimeout(kOtaHttpTimeoutMs);  // the server may be busy streaming to another scarf
     http.setAuthorization(kOtaHttpUser, kMeshPassword.c_str());
     int code = http.GET();
     if (code != 200)
@@ -428,6 +433,7 @@ bool OtaManager::downloadAndFlash(const String& base, size_t firmwareSize, const
 {
     HTTPClient http;
     http.begin(base + "/firmware");
+    http.setTimeout(kOtaHttpTimeoutMs);
     http.setAuthorization(kOtaHttpUser, kMeshPassword.c_str());
     int code = http.GET();
     if (code != 200)
@@ -454,7 +460,7 @@ bool OtaManager::downloadAndFlash(const String& base, size_t firmwareSize, const
     WiFiClient* stream = http.getStreamPtr();
     stream->setTimeout(10000);
 
-    uint8_t  buf[kOtaFlashChunkBytes];
+    static uint8_t buf[kOtaFlashChunkBytes];  // static: too big for the loop stack
     size_t   downloaded = 0;
     uint32_t lastToggle = millis();
     bool     pulseLedOn = true;

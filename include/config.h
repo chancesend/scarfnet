@@ -7,7 +7,7 @@
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
 // Version 100 = 1.00, version 102 = 1.02, etc
-const uint16_t kScarfVersion              = 114;
+const uint16_t kScarfVersion              = 115;
 
 // ── ObservableButton ─────────────────────────────────────────────────────────
 const uint32_t kButtonPollIntervalMs       = 50;
@@ -105,12 +105,16 @@ const int      kOtaHoldMs                 = 5000;
 const int      kOtaBootBlinkHalfPeriodMs  = 200;
 const uint32_t kOtaIdleBlinkHalfPeriodMs  = 500;
 const uint32_t kOtaConnectLedHalfPeriodMs = 150;
-const uint32_t kOtaScanIntervalMs         = 8000;
+const uint32_t kOtaScanIntervalMs         = 3000;
 const uint32_t kOtaConnectTimeoutMs       = 15000;
-const size_t   kOtaFlashChunkBytes        = 512;
+const size_t   kOtaFlashChunkBytes        = 4096;  // one flash sector; buffers are static
 // Server gives up on one receiver's firmware download after this long, so a
 // stalled client can't block every other scarf waiting to update.
 const uint32_t kOtaServeTimeoutMs         = 60000;
+// Receiver HTTP timeout. The server streams to one receiver at a time, so a
+// receiver may wait for another's download; waiting beats timing out and
+// losing its turn.
+const uint32_t kOtaHttpTimeoutMs          = 30000;
 
 // ── OTA: automatic update ────────────────────────────────────────────────────
 // Once a scarf has seen a peer on newer firmware, it periodically runs a quick
@@ -118,6 +122,6 @@ const uint32_t kOtaServeTimeoutMs         = 60000;
 // is on kEspNowChannel, so the radio never leaves the mesh). If the server is
 // newer, the scarf restarts into OTA receiver mode and updates itself. If no
 // update completes within kOtaAutoTimeoutMs it restarts back to normal.
-const uint32_t kOtaAutoScanIntervalMs     = 30000;
+const uint32_t kOtaAutoScanIntervalMs     = 10000;
 const uint32_t kOtaAutoScanDwellMs        = 150;    // time listening on the channel per scan
 const uint32_t kOtaAutoTimeoutMs          = 120000;
