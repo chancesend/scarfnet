@@ -17,7 +17,7 @@ namespace Scarfnet
 // Modes:
 //   Receiver (yellow blink): default on boot-trigger entry. Periodically scans
 //     for a server AP and downloads firmware if a newer version is found.
-//   Server (purple blink): entered by holding the button 10 s while in receiver
+//   Server (purple blink): entered by holding the button 5 s (kOtaHoldMs) while in receiver
 //     mode. Starts a WiFi AP and HTTP server that serves the running firmware
 //     binary to receiver scarves.
 class OtaManager
@@ -31,7 +31,7 @@ public:
     ~OtaManager(); // defined in .cpp where WebServer is complete
 
     // Called once at boot (before mesh init). Returns true if OTA mode was
-    // triggered (button held 10 s); false if button was released early.
+    // triggered (button held kOtaHoldMs); false if button was released early.
     bool checkBootTrigger();
 
     // Must be called every loop iteration while in OTA mode (normal mesh loop is skipped).

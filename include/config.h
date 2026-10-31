@@ -7,7 +7,7 @@
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
 // Version 100 = 1.00, version 102 = 1.02, etc
-const uint16_t kScarfVersion              = 108;
+const uint16_t kScarfVersion              = 109;
 
 // ── ObservableButton ─────────────────────────────────────────────────────────
 const uint32_t kButtonPollIntervalMs       = 50;
@@ -91,7 +91,7 @@ const int      kClockWarmupSamples        = 3;
 const int32_t  kSwarmMaxClockDeviationMs  = 5000;
 
 // ── OTA ──────────────────────────────────────────────────────────────────────
-const int      kOtaHoldMs                 = 10000;
+const int      kOtaHoldMs                 = 5000;
 const int      kOtaBootBlinkHalfPeriodMs  = 200;
 const uint32_t kOtaIdleBlinkHalfPeriodMs  = 500;
 const uint32_t kOtaConnectLedHalfPeriodMs = 150;

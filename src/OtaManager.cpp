@@ -53,7 +53,7 @@ bool OtaManager::checkBootTrigger()
     if (digitalRead(_buttonPin) != LOW)
         return false;
 
-    Scarfnet::log("[OTA] Button held at boot — waiting 10s for OTA trigger...");
+    Scarfnet::log("[OTA] Button held at boot — waiting %ds for OTA trigger...", kOtaHoldMs / 1000);
 
     for (int elapsed = 0; elapsed < kOtaHoldMs; elapsed += kOtaBootBlinkHalfPeriodMs)
     {
@@ -92,7 +92,7 @@ void OtaManager::loop()
 
     bool pressed = (digitalRead(_buttonPin) == LOW);
 
-    // Server-mode trigger: hold button 10 s while in receiver mode.
+    // Server-mode trigger: hold button kOtaHoldMs while in receiver mode.
     // Require a release first so the boot-hold doesn't count.
     if (_mode == Mode::eReceiver)
     {

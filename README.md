@@ -159,10 +159,10 @@ Owns the list of LED patterns (`PatternList`) and tracks the currently active pa
 
 Manages peer-to-peer OTA firmware updates over a temporary WiFi AP. Operates independently of the mesh (mesh init is skipped in OTA mode).
 
-**OTA mode**: To enter OTA update mode, hold the button at boot for 10 s (yellow blink countdown). Releasing early cancels. After entering OTA mode, normal mesh setup is skipped entirely. You will initially be in Receiver mode.
+**OTA mode**: To enter OTA update mode, hold the button at boot for 5 s (yellow blink countdown). Releasing early cancels. After entering OTA mode, normal mesh setup is skipped entirely. You will initially be in Receiver mode.
 
 - **Receiver** (slow yellow blink): scans for a `scarfnet-ota-v{N}` AP, connects, fetches `/info`, and downloads+flashes firmware if the server version is newer. LED feedback: orange during scan → white strobes on connect → red pulse speeding up during download → solid green on success.
-- **Server** (purple blink): entered by holding the button 10 s while in receiver mode. Reads running firmware from flash, starts a WPA2 AP, and serves the binary via HTTP with Basic Auth on `/info` (JSON metadata) and `/firmware` (raw binary). Uses `esp_partition_read()` + `MD5Builder` to compute firmware size and MD5 without buffering in RAM.
+- **Server** (purple blink): entered by holding the button 5 s while in receiver mode. Reads running firmware from flash, starts a WPA2 AP, and serves the binary via HTTP with Basic Auth on `/info` (JSON metadata) and `/firmware` (raw binary). Uses `esp_partition_read()` + `MD5Builder` to compute firmware size and MD5 without buffering in RAM.
 
 **Security**: double version check (SSID name + `/info` JSON), WPA2 AP with `kMeshPassword`, HTTP Basic Auth (`OTA_HTTP_USER` / `kMeshPassword`). Receivers reject downgrades.
 
