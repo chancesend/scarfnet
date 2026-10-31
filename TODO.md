@@ -23,6 +23,10 @@
 ## Bugs found
 - [ ] If a scarf misses the update from a button push of another scarf, then it won't ever catch up when receiving future heartbeats (this is the main bug preventing the network from being resiliant to network issues)
 - [ ] Only 1 scarf should be able to get into tempo mode at once, and any other scarves pressed should put the whole network out of tempo mode (including the one that initially entered tempo mode). This will solve problems that occur if 2 scarves get into tempo mode and try to compete - with a fix, the 2nd scarf that gets into tempo mode will get the other scarf out of tempo mode
+- [ ] Beat sync has no ordering, so the last heartbeat heard wins (seen in v111 live test). Re-tapping a tempo currently fixes it.
+    - A scarf that toggles tap mode then taps once broadcasts `beat=0` for ~3 s (it's the authority but has no tempo yet). Every non-tap scarf that hears it clears its tempo, then re-adopts from the next heartbeat, so tempo flaps on/off network-wide.
+    - Two different tempos (or the same interval at different phases) compete with no deterministic winner; it has settled in testing but isn't guaranteed.
+    - Proposed fix: version the beat like `changeIndex` — a `beatIndex` (fits in the packet's unused 2-byte `_reserved` field) bumped on every local tempo change, adopted only if newer, with a randomizer/presser-id tie-break. Needs a fleet-wide update.
 - [ ] Possible problem when a new scarf is added after others have been on for a long time
 - [ ] Can get into a state where 1 scarf isn't updating any of the others on button push, but is changing its own pattern (so we know it isn't crashed). This is fixed on reset of that scarf
 
