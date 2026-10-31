@@ -7,7 +7,7 @@
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
 // Version 100 = 1.00, version 102 = 1.02, etc
-const uint16_t kScarfVersion              = 112;
+const uint16_t kScarfVersion              = 114;
 
 // ── ObservableButton ─────────────────────────────────────────────────────────
 const uint32_t kButtonPollIntervalMs       = 50;
@@ -108,6 +108,9 @@ const uint32_t kOtaConnectLedHalfPeriodMs = 150;
 const uint32_t kOtaScanIntervalMs         = 8000;
 const uint32_t kOtaConnectTimeoutMs       = 15000;
 const size_t   kOtaFlashChunkBytes        = 512;
+// Server gives up on one receiver's firmware download after this long, so a
+// stalled client can't block every other scarf waiting to update.
+const uint32_t kOtaServeTimeoutMs         = 60000;
 
 // ── OTA: automatic update ────────────────────────────────────────────────────
 // Once a scarf has seen a peer on newer firmware, it periodically runs a quick

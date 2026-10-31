@@ -260,20 +260,30 @@ void OtaManager::handleFirmwareRequest()
         "Connection: close\r\n\r\n";
     client.print(headers);
 
-    uint8_t buf[kOtaFlashChunkBytes];
-    size_t remaining = _firmwareSize;
-    size_t offset    = 0;
-    while (remaining > 0 && client.connected())
+    // A receiver that drops out mid-download can leave the socket looking
+    // connected while every write blocks and fails. Stop on the first short
+    // write, and cap the whole transfer, so one bad client can't hang the
+    // server for everyone else.
+    uint8_t  buf[kOtaFlashChunkBytes];
+    size_t   remaining = _firmwareSize;
+    size_t   offset    = 0;
+    uint32_t start     = millis();
+    const char* why    = "complete";
+    while (remaining > 0)
     {
+        if (!client.connected())                      { why = "interrupted (client disconnected)"; break; }
+        if (millis() - start >= kOtaServeTimeoutMs)   { why = "aborted (transfer timeout)";        break; }
+
         size_t chunk = (remaining < kOtaFlashChunkBytes) ? remaining : kOtaFlashChunkBytes;
         esp_partition_read(partition, offset, buf, chunk);
-        client.write(buf, chunk);
+        if (client.write(buf, chunk) != chunk)        { why = "aborted (write failed)";            break; }
         offset    += chunk;
         remaining -= chunk;
     }
+    if (remaining > 0) client.stop();
 
-    Scarfnet::log("[OTA] Firmware stream %s (%u bytes sent)",
-        (remaining == 0) ? "complete" : "interrupted", offset);
+    Scarfnet::log("[OTA] Firmware stream %s (%u of %u bytes sent, %u ms)",
+        why, offset, _firmwareSize, millis() - start);
 }
 
 void OtaManager::serverLoop()
