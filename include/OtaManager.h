@@ -17,9 +17,11 @@ namespace Scarfnet
 // Modes:
 //   Receiver (yellow blink): default on boot-trigger entry. Periodically scans
 //     for a server AP and downloads firmware if a newer version is found.
+//     Also entered automatically after a normal-mode scarf finds a newer
+//     server (see autoUpdateTick); then it gives up after kOtaAutoTimeoutMs.
 //   Server (purple blink): entered by holding the button 5 s (kOtaHoldMs) while in receiver
-//     mode. Starts a WiFi AP and HTTP server that serves the running firmware
-//     binary to receiver scarves.
+//     mode. Starts a WiFi AP (on kEspNowChannel) and HTTP server that serves the
+//     running firmware binary to receiver scarves.
 class OtaManager
 {
 public:
@@ -36,6 +38,12 @@ public:
 
     // Must be called every loop iteration while in OTA mode (normal mesh loop is skipped).
     void loop();
+
+    // Call every loop iteration in normal mode. While a peer on newer firmware
+    // has been seen, periodically runs a non-blocking scan of the ESP-NOW
+    // channel for an OTA server; if one is newer than us, restarts into
+    // receiver mode to update (giving up after kOtaAutoTimeoutMs).
+    void autoUpdateTick(bool newerPeerSeen);
 
     // Returns true after checkBootTrigger() confirmed OTA mode.
     bool isActive() const { return _active; }
@@ -82,6 +90,12 @@ private:
 
     // Receiver state
     uint32_t    _lastScanMs {0};
+    bool        _autoMode    {false};  // entered via auto-update, not the button
+    uint32_t    _autoStartMs {0};
+
+    // Normal-mode auto-update scan state
+    bool        _autoScanRunning {false};
+    uint32_t    _lastAutoScanMs  {0};
 };
 
 } // namespace Scarfnet

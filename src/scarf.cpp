@@ -296,6 +296,7 @@ void Scarf::loop()
     _userScheduler.execute();
     _mesh->update();
     updateTime();
+    _otaManager->autoUpdateTick(_newerVersionSeen);
 
     EVERY_N_MILLISECONDS(kLedRefreshRateMs)
     {

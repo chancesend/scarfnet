@@ -108,3 +108,13 @@ const uint32_t kOtaConnectLedHalfPeriodMs = 150;
 const uint32_t kOtaScanIntervalMs         = 8000;
 const uint32_t kOtaConnectTimeoutMs       = 15000;
 const size_t   kOtaFlashChunkBytes        = 512;
+
+// ── OTA: automatic update ────────────────────────────────────────────────────
+// Once a scarf has seen a peer on newer firmware, it periodically runs a quick
+// background scan of the ESP-NOW channel for an OTA server AP (the server's AP
+// is on kEspNowChannel, so the radio never leaves the mesh). If the server is
+// newer, the scarf restarts into OTA receiver mode and updates itself. If no
+// update completes within kOtaAutoTimeoutMs it restarts back to normal.
+const uint32_t kOtaAutoScanIntervalMs     = 30000;
+const uint32_t kOtaAutoScanDwellMs        = 150;    // time listening on the channel per scan
+const uint32_t kOtaAutoTimeoutMs          = 120000;

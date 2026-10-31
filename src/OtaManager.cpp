@@ -12,6 +12,9 @@
 #include <ArduinoJson.h>
 #include <esp_ota_ops.h>
 #include <esp_partition.h>
+#include <esp_attr.h>
+
+#include "ota_ssid.h"
 
 namespace Scarfnet
 {
@@ -19,9 +22,13 @@ namespace Scarfnet
 static const CRGB kReceiverColor {255, 200,   0}; // yellow
 static const CRGB kServerColor   {160,   0, 160}; // purple
 
-static const char* const kOtaSsidPrefix = "scarfnet-ota-v";
 static const char* const kOtaServerIp   = "192.168.4.1";
 static const uint16_t    kOtaHttpPort   = 80;
+
+// Survives a software restart (not a power cycle): set just before restarting
+// into auto-update mode, read and cleared by checkBootTrigger().
+static const uint32_t kAutoOtaMagic = 0x4155544Fu;  // "AUTO"
+RTC_NOINIT_ATTR static uint32_t gAutoOtaRequest;
 
 // ─── Construction ────────────────────────────────────────────────────────────
 
@@ -49,6 +56,18 @@ void OtaManager::strobe(CRGB color, int count, int onMs, int offMs)
 
 bool OtaManager::checkBootTrigger()
 {
+    if (gAutoOtaRequest == kAutoOtaMagic) {
+        gAutoOtaRequest = 0;  // one-shot: the next boot is normal
+        Scarfnet::log("[OTA] Auto-update requested — entering receiver mode (firmware v%d)",
+                      kScarfVersion);
+        _active      = true;
+        _autoMode    = true;
+        _autoStartMs = millis();
+        _lastScanMs  = millis() - kOtaScanIntervalMs;  // scan right away
+        WiFi.mode(WIFI_STA);
+        return true;
+    }
+
     pinMode(_buttonPin, INPUT);
     if (digitalRead(_buttonPin) != LOW)
         return false;
@@ -80,6 +99,15 @@ bool OtaManager::checkBootTrigger()
 void OtaManager::loop()
 {
     uint32_t now = millis();
+
+    // An automatic update that found nothing to install gives up and returns
+    // the scarf to normal operation (the RTC flag is already cleared). Only a
+    // receiver times out — if someone switched this scarf to server mode, it
+    // stays a server.
+    if (_autoMode && _mode == Mode::eReceiver && now - _autoStartMs >= kOtaAutoTimeoutMs) {
+        Scarfnet::log("[OTA] Auto-update timed out — restarting to normal mode");
+        ESP.restart();
+    }
 
     // LED blink (pauses naturally during blocking receiver operations)
     if (now - _lastToggleMs >= kOtaIdleBlinkHalfPeriodMs)
@@ -170,9 +198,11 @@ void OtaManager::enterServerMode()
         return;
     }
 
+    // AP on the ESP-NOW channel so normal-mode scarves can find it with a
+    // single-channel scan without leaving the mesh (see autoUpdateTick).
     String ssid = String(kOtaSsidPrefix) + kScarfVersion;
     WiFi.mode(WIFI_AP);
-    WiFi.softAP(ssid.c_str(), kMeshPassword.c_str());
+    WiFi.softAP(ssid.c_str(), kMeshPassword.c_str(), kEspNowChannel);
     Scarfnet::log("[OTA] AP: %s  IP: %s", ssid.c_str(), WiFi.softAPIP().toString().c_str());
 
     _webServer.reset(new WebServer(kOtaHttpPort));
@@ -269,10 +299,10 @@ void OtaManager::receiverLoop()
     for (int i = 0; i < found; i++)
     {
         String ssid = WiFi.SSID(i);
-        if (!ssid.startsWith(kOtaSsidPrefix))
+        int serverVersion = otaServerVersionFromSsid(ssid.c_str());
+        if (serverVersion < 0)
             continue;
 
-        int serverVersion = ssid.substring(strlen(kOtaSsidPrefix)).toInt();
         if (serverVersion <= kScarfVersion)
         {
             Scarfnet::log("[OTA] Found %s (v%d) — not newer than own v%d, skipping",
@@ -481,6 +511,47 @@ bool OtaManager::downloadAndFlash(const String& base, size_t firmwareSize, const
     delay(2000);
     ESP.restart();
     return true; // unreachable
+}
+
+// ─── Automatic update (normal mode) ──────────────────────────────────────────
+
+void OtaManager::autoUpdateTick(bool newerPeerSeen)
+{
+    if (!newerPeerSeen) return;
+
+    if (_autoScanRunning) {
+        int16_t found = WiFi.scanComplete();
+        if (found == WIFI_SCAN_RUNNING) return;
+        _autoScanRunning = false;
+
+        int best = -1;
+        for (int i = 0; i < found; i++) {
+            int v = otaServerVersionFromSsid(WiFi.SSID(i).c_str());
+            if (v > best) best = v;
+        }
+        WiFi.scanDelete();
+
+        if (best > kScarfVersion) {
+            Scarfnet::log("[OTA] Auto-update: server v%d found (own v%d) — restarting into receiver mode",
+                          best, kScarfVersion);
+            gAutoOtaRequest = kAutoOtaMagic;
+            delay(100);  // let the log flush
+            ESP.restart();
+        }
+        return;
+    }
+
+    uint32_t now = millis();
+    if (now - _lastAutoScanMs < kOtaAutoScanIntervalMs) return;
+    _lastAutoScanMs = now;
+
+    // Async, single channel: the radio stays on the mesh channel and the loop
+    // keeps running, so the scarf keeps syncing while it looks.
+    int16_t r = WiFi.scanNetworks(/*async=*/true, /*show_hidden=*/false, /*passive=*/false,
+                                  kOtaAutoScanDwellMs, kEspNowChannel);
+    _autoScanRunning = (r == WIFI_SCAN_RUNNING);
+    Scarfnet::log("[OTA] Auto-update: newer peer seen — scanning channel %u for an OTA server%s",
+                  kEspNowChannel, _autoScanRunning ? "" : " (scan failed to start)");
 }
 
 } // namespace Scarfnet

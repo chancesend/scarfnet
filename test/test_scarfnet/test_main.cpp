@@ -7,6 +7,7 @@
 #include "mesh/test_mesh.h"
 #include "node_tracker/test_node_tracker.h"
 #include "observable_button/test_ObservableButton.h"
+#include "ota/test_ota_ssid.h"
 #include "patterns/test_patterns.h"
 #include "patterns/test_cylon.h"
 #include "swarm/test_swarm_ema.h"
@@ -38,6 +39,7 @@ int main( int argc, char **argv) {
     node_tracker_tests();
     mesh_tests();
     observable_button_tests();
+    ota_ssid_tests();
     patterns_tests();
     cylon_tests();
     swarm_ema_tests();
