@@ -29,21 +29,48 @@ inline void writeSyncState(HeartbeatPacket& pkt, const SyncState& state)
     pkt.globalRandomizer = state.randomizer;
 }
 
+// Total order over sync states: true if `incoming` should replace `local`.
+//
+// Higher changeIndex wins. At an equal changeIndex — two scarves pressed from
+// the same index at nearly the same moment — the higher randomizer wins, then
+// the higher presser id. Without this tie-break each scarf keeps whichever
+// press it heard first and rejects the other as "not newer", splitting the
+// network until the next press. The randomizer is fresh per press, so the
+// winner is effectively a coin flip rather than always the same scarf; the
+// presser id only decides a 1-in-65536 randomizer tie, and always does since
+// two colliding presses come from different pressers. Identical states are
+// not newer, so steady-state duplicates are still ignored.
+inline bool isNewerState(const SyncState& incoming, const SyncState& local)
+{
+    if (incoming.changeIndex != local.changeIndex)
+        return shouldAcceptUpdate(incoming.changeIndex, local.changeIndex);
+    if (incoming.randomizer != local.randomizer)
+        return incoming.randomizer > local.randomizer;
+    return incoming.lastPressId > local.lastPressId;
+}
+
+// The sync state a packet carries, as sent (no rollover guard applied).
+inline SyncState syncStateOf(const HeartbeatPacket& pkt)
+{
+    return SyncState{pkt.changeIndex, pkt.lastPressMs, pkt.lastPressId, pkt.globalRandomizer};
+}
+
 enum class UpdateDecision : uint8_t {
     Accept,           // newer state: apply the pattern, then adoptSyncState()
-    Ignore,           // not newer, same pattern: steady-state duplicate, silent
-    RejectDiffering,  // not newer, different pattern: this scarf or the sender
-                      // is out of step — the field "stuck scarf" signature
+    Ignore,           // not newer, same look: steady-state duplicate, silent
+    RejectDiffering,  // not newer, different pattern or variation: this scarf
+                      // or the sender is out of step — the "stuck scarf" signature
 };
 
 // What to do with an incoming heartbeat, given our state and current pattern.
 inline UpdateDecision classifyUpdate(const HeartbeatPacket& pkt, const SyncState& local,
                                      const char* currentPattern)
 {
-    if (shouldAcceptUpdate(pkt.changeIndex, local.changeIndex))
+    if (isNewerState(syncStateOf(pkt), local))
         return UpdateDecision::Accept;
-    bool samePattern = strncmp(pkt.pattern, currentPattern, sizeof(pkt.pattern)) == 0;
-    return samePattern ? UpdateDecision::Ignore : UpdateDecision::RejectDiffering;
+    bool sameLook = strncmp(pkt.pattern, currentPattern, sizeof(pkt.pattern)) == 0 &&
+                    pkt.globalRandomizer == local.randomizer;
+    return sameLook ? UpdateDecision::Ignore : UpdateDecision::RejectDiffering;
 }
 
 // Call only after classifyUpdate() returned Accept and the pattern was applied.

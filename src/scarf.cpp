@@ -45,9 +45,9 @@ void Scarf::sendMessage()
     // Jitter the next interval so nodes on identical boot schedules drift apart.
     int32_t jitter = (int32_t)random(kHeartbeatJitterMs * 2 + 1) - (int32_t)kHeartbeatJitterMs;
     _taskSendMessage.setInterval(kHeartbeatIntervalMs + jitter);
-    Scarfnet::log("[SND] id=%u pattern=%s ci=%u time=%u rnd=%u ver=%u",
+    Scarfnet::log("[SND] id=%u pattern=%s ci=%u time=%u rnd=%u beat=%u/%u ver=%u",
                   pkt.id, pkt.pattern, pkt.changeIndex, pkt.currentTimeMs,
-                  pkt.globalRandomizer, pkt.version);
+                  pkt.globalRandomizer, pkt.beatIntervalMs, pkt.beatPhaseMs, pkt.version);
 }
 
 void Scarf::onNodeJoined(Mesh::NodeId nodeId)
@@ -111,8 +111,11 @@ void Scarf::onReceived(const HeartbeatPacket& pkt)
             return;
         case UpdateDecision::RejectDiffering:
             Scarfnet::log("[SCARF][RCV] STUCK? rejected differing pattern=%s from node %u — "
-                          "incoming ci=%u <= local ci=%u (local pattern=%s)",
-                          pkt.pattern, pkt.id, pkt.changeIndex, _sync.changeIndex,
+                          "incoming (ci=%u rnd=%u by=%u) not newer than local "
+                          "(ci=%u rnd=%u by=%u pattern=%s)",
+                          pkt.pattern, pkt.id,
+                          pkt.changeIndex, pkt.globalRandomizer, pkt.lastPressId,
+                          _sync.changeIndex, _sync.randomizer, _sync.lastPressId,
                           currentPattern.c_str());
             return;
     }

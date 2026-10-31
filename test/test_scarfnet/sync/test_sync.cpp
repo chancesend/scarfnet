@@ -116,7 +116,7 @@ struct RelayNode
 
     void receive(const Scarfnet::HeartbeatPacket& pkt)
     {
-        if (Scarfnet::shouldAcceptUpdate(pkt.changeIndex, state.changeIndex))
+        if (Scarfnet::isNewerState(Scarfnet::syncStateOf(pkt), state))
             Scarfnet::adoptSyncState(state, pkt);
     }
 };
@@ -153,10 +153,109 @@ void test_sync_relayed_update_carries_pressers_randomizer()
     TEST_ASSERT_EQUAL_UINT32(6u, missed.state.changeIndex);
     TEST_ASSERT_EQUAL_HEX16(0xBEEF, missed.state.randomizer);
 
-    // Equal ci: the presser's own later heartbeats can't correct a mismatch,
-    // which is why it would otherwise persist until the next press.
-    TEST_ASSERT_FALSE(Scarfnet::shouldAcceptUpdate(presser.heartbeat().changeIndex,
-                                                   missed.state.changeIndex));
+    // Missed now holds exactly the presser's state, so the presser's own later
+    // heartbeats are plain duplicates.
+    TEST_ASSERT_FALSE(Scarfnet::isNewerState(Scarfnet::syncStateOf(presser.heartbeat()),
+                                             missed.state));
+}
+
+// ---------------------------------------------------------------------------
+// isNewerState: equal-changeIndex tie-break (simultaneous presses)
+// ---------------------------------------------------------------------------
+
+static Scarfnet::HeartbeatPacket packetWith(Scarfnet::ChangeIndex ci, const char* pattern);
+
+void test_newer_state_higher_index_wins_regardless_of_tiebreak_fields()
+{
+    Scarfnet::SyncState local    = {5, 0, 999, 0xFFFF};
+    Scarfnet::SyncState incoming = {6, 0,   1, 0x0001};
+    TEST_ASSERT_TRUE(Scarfnet::isNewerState(incoming, local));
+    TEST_ASSERT_FALSE(Scarfnet::isNewerState(local, incoming));
+}
+
+void test_newer_state_equal_index_higher_randomizer_wins()
+{
+    // Randomizer decides before presser id, so the lower-id scarf can win.
+    Scarfnet::SyncState low  = {6, 0, 900, 0x1000};
+    Scarfnet::SyncState high = {6, 0, 100, 0x2000};
+    TEST_ASSERT_TRUE(Scarfnet::isNewerState(high, low));
+    TEST_ASSERT_FALSE(Scarfnet::isNewerState(low, high));
+}
+
+void test_newer_state_equal_index_and_randomizer_higher_presser_wins()
+{
+    Scarfnet::SyncState a = {6, 0, 100, 0x1234};
+    Scarfnet::SyncState b = {6, 0, 200, 0x1234};
+    TEST_ASSERT_TRUE(Scarfnet::isNewerState(b, a));
+    TEST_ASSERT_FALSE(Scarfnet::isNewerState(a, b));
+}
+
+void test_newer_state_identical_is_not_newer()
+{
+    Scarfnet::SyncState s = {6, 5000, 100, 0x1234};
+    TEST_ASSERT_FALSE(Scarfnet::isNewerState(s, s));
+}
+
+void test_newer_state_fresh_boot_states_are_duplicates()
+{
+    // Two freshly booted scarves both carry the all-zero default state.
+    Scarfnet::SyncState boot = {0, 0, 0, 0};
+    TEST_ASSERT_FALSE(Scarfnet::isNewerState(boot, boot));
+}
+
+// The field split: A and B press from ci=5 at the same moment. Each other scarf
+// keeps whichever press reaches it first. After one round of heartbeats every
+// scarf must hold the same state — the tie-break winner.
+void test_sync_simultaneous_presses_converge_on_one_winner()
+{
+    const Scarfnet::SyncState pressA = {6, 5000, /*id=*/100, /*rnd=*/0x9000};
+    const Scarfnet::SyncState pressB = {6, 5003, /*id=*/900, /*rnd=*/0x4000};
+
+    RelayNode a{pressA};
+    RelayNode b{pressB};
+    RelayNode c{{5, 1000, 7, 0x1111}};
+    RelayNode d{{5, 1000, 7, 0x1111}};
+
+    // C hears A first, D hears B first: the network is split.
+    c.receive(a.heartbeat());
+    d.receive(b.heartbeat());
+    c.receive(b.heartbeat());
+    d.receive(a.heartbeat());
+
+    // One round of everyone hearing everyone.
+    RelayNode* nodes[] = {&a, &b, &c, &d};
+    Scarfnet::HeartbeatPacket beats[4];
+    for (int i = 0; i < 4; ++i) beats[i] = nodes[i]->heartbeat();
+    for (auto* n : nodes)
+        for (auto& pkt : beats) n->receive(pkt);
+
+    // A wins on randomizer even though B has the higher id.
+    for (auto* n : nodes) {
+        TEST_ASSERT_EQUAL_UINT32(6u, n->state.changeIndex);
+        TEST_ASSERT_EQUAL_HEX16(0x9000, n->state.randomizer);
+        TEST_ASSERT_EQUAL_UINT32(100u, n->state.lastPressId);
+    }
+}
+
+void test_classify_equal_index_winning_tiebreak_accepted()
+{
+    Scarfnet::SyncState local = {6, 0, 100, 0x1000};
+    Scarfnet::HeartbeatPacket pkt = packetWith(6, "fractal");
+    pkt.globalRandomizer = 0x2000;
+    pkt.lastPressId      = 200;
+    TEST_ASSERT_TRUE(Scarfnet::classifyUpdate(pkt, local, "cylon")
+                     == Scarfnet::UpdateDecision::Accept);
+}
+
+void test_classify_same_pattern_different_randomizer_is_differing()
+{
+    // Same pattern name but a different variation still looks different.
+    Scarfnet::SyncState local = {6, 0, 100, 0x2000};
+    Scarfnet::HeartbeatPacket pkt = packetWith(6, "cylon");
+    pkt.globalRandomizer = 0x1000;  // loses the tie-break
+    pkt.lastPressId      = 200;
+    TEST_ASSERT_TRUE(Scarfnet::classifyUpdate(pkt, local, "cylon")
+                     == Scarfnet::UpdateDecision::RejectDiffering);
 }
 
 // ---------------------------------------------------------------------------
@@ -256,4 +355,12 @@ void sync_tests()
     RUN_TEST(test_classify_older_index_different_pattern_rejected_differing);
     RUN_TEST(test_build_heartbeat_fills_all_fields);
     RUN_TEST(test_set_pattern_name_truncates_and_terminates);
+    RUN_TEST(test_newer_state_higher_index_wins_regardless_of_tiebreak_fields);
+    RUN_TEST(test_newer_state_equal_index_higher_randomizer_wins);
+    RUN_TEST(test_newer_state_equal_index_and_randomizer_higher_presser_wins);
+    RUN_TEST(test_newer_state_identical_is_not_newer);
+    RUN_TEST(test_newer_state_fresh_boot_states_are_duplicates);
+    RUN_TEST(test_sync_simultaneous_presses_converge_on_one_winner);
+    RUN_TEST(test_classify_equal_index_winning_tiebreak_accepted);
+    RUN_TEST(test_classify_same_pattern_different_randomizer_is_differing);
 }
