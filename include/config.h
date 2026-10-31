@@ -7,7 +7,7 @@
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
 // Version 100 = 1.00, version 102 = 1.02, etc
-const uint16_t kScarfVersion              = 111;
+const uint16_t kScarfVersion              = 112;
 
 // ── ObservableButton ─────────────────────────────────────────────────────────
 const uint32_t kButtonPollIntervalMs       = 50;
@@ -34,6 +34,9 @@ const uint32_t kSyncBlinkPeriodMs         = 5000;
 // kBurstSyncIntervalMs so the joining node converges pattern and clock quickly.
 const uint32_t kBurstSyncIntervalMs       = 500;
 const int      kBurstSyncCount            = 3;
+// Random 0..kBurstSyncJitterMs added to the first burst heartbeat. Every peer
+// hears a join at the same moment, so without it their bursts collide on air.
+const uint32_t kBurstSyncJitterMs         = 250;
 
 // ── Scarf: epidemic re-broadcast on accept ───────────────────────────────────
 // When a scarf accepts a new pattern (from a button press elsewhere), it

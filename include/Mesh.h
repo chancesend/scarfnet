@@ -101,6 +101,7 @@ private:
     RxEntry      _rxQueue[kRxQueueSize];
     int          _rxHead = 0;  // next write index (WiFi task)
     int          _rxTail = 0;  // next read index  (loop task)
+    uint32_t     _rxDropped = 0;  // packets dropped on a full queue; logged by update()
 };
 
 } // namespace Scarfnet

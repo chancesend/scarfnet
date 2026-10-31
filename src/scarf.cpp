@@ -39,15 +39,16 @@ Scarf::Scarf() :
 void Scarf::sendMessage()
 {
     HeartbeatPacket pkt = buildHeartbeat(_mesh->nodeId(), _mesh->timeMs(), _sync,
-                                         _patternManager->getCurrentPattern(), _tapTempo);
+                                         _patternManager->getCurrentPattern(), _tempo);
     _mesh->broadcast(pkt);
 
     // Jitter the next interval so nodes on identical boot schedules drift apart.
     int32_t jitter = (int32_t)random(kHeartbeatJitterMs * 2 + 1) - (int32_t)kHeartbeatJitterMs;
     _taskSendMessage.setInterval(kHeartbeatIntervalMs + jitter);
-    Scarfnet::log("[SND] id=%u pattern=%s ci=%u time=%u rnd=%u beat=%u/%u ver=%u",
+    Scarfnet::log("[SND] id=%u pattern=%s ci=%u time=%u rnd=%u ti=%u beat=%u/%u ver=%u",
                   pkt.id, pkt.pattern, pkt.changeIndex, pkt.currentTimeMs,
-                  pkt.globalRandomizer, pkt.beatIntervalMs, pkt.beatPhaseMs, pkt.version);
+                  pkt.globalRandomizer, pkt.tempoIndex, pkt.beatIntervalMs, pkt.beatPhaseMs,
+                  pkt.version);
 }
 
 void Scarf::onNodeJoined(Mesh::NodeId nodeId)
@@ -58,8 +59,10 @@ void Scarf::onNodeJoined(Mesh::NodeId nodeId)
     _blinkNoNodes.enableDelayed(msToNextSync);
 
     // Burst sync so the joining node converges pattern and clock quickly.
+    // Every peer hears the join at the same moment; jitter the start so their
+    // bursts don't collide on air. See kBurstSyncJitterMs.
     _taskBurstSync.setIterations(kBurstSyncCount);
-    _taskBurstSync.enableDelayed(kBurstSyncIntervalMs);
+    _taskBurstSync.enableDelayed(kBurstSyncIntervalMs + (unsigned long)random(kBurstSyncJitterMs + 1));
 }
 
 void Scarf::onNodeLeft(Mesh::NodeId nodeId)
@@ -99,9 +102,21 @@ void Scarf::onReceived(const HeartbeatPacket& pkt)
 
     this->debugModeUpdate(pkt);
 
-    // Beat info flows independently of pattern changes, on every heartbeat.
-    _tapTempo.followPacket(pkt.beatIntervalMs, pkt.currentTimeMs, pkt.beatPhaseMs,
-                           _tapTempoMode, _mesh->timeMs());
+    // Tempo is versioned independently of the pattern: adopt only a newer one.
+    switch (_tempo.receive(pkt.tempoIndex, pkt.beatIntervalMs, pkt.currentTimeMs, pkt.beatPhaseMs)) {
+        case TempoSync::Result::Ignored:
+            break;
+        case TempoSync::Result::TakenOver:
+            Scarfnet::log("[SCARF][TEMPO] node %u took over tap-tempo (ti=%u interval=%u) — leaving tap mode",
+                          pkt.id, pkt.tempoIndex, pkt.beatIntervalMs);
+            _taskRebroadcast.restartDelayed((unsigned long)random(kRebroadcastJitterMs + 1));
+            break;
+        case TempoSync::Result::Adopted:
+            Scarfnet::log("[SCARF][TEMPO] adopting ti=%u interval=%u from node %u",
+                          pkt.tempoIndex, pkt.beatIntervalMs, pkt.id);
+            _taskRebroadcast.restartDelayed((unsigned long)random(kRebroadcastJitterMs + 1));
+            break;
+    }
 
     const std::string currentPattern = _patternManager->getCurrentPattern();
     switch (classifyUpdate(pkt, _sync, currentPattern.c_str())) {
@@ -219,17 +234,17 @@ void Scarf::processEvent(const ObservableButton::Event& event)
     {
         case ObservableButton::Event::eDown:
         {
-            if (_tapTempoMode) {
-                _tapTempo.tap(_mesh->timeMs());
-                Scarfnet::log("eDown (tap-tempo) interval=%ums active=%d",
-                    _tapTempo.beatIntervalMs(), (int)_tapTempo.isActive());
+            if (_tempo.tapMode) {
+                _tempo.tap(_mesh->timeMs());
+                Scarfnet::log("eDown (tap-tempo) interval=%ums active=%d ti=%u",
+                    _tempo.tempo.beatIntervalMs(), (int)_tempo.tempo.isActive(), _tempo.index);
                 _taskSendMessage.forceNextIteration();
             }
             break;
         }
         case ObservableButton::Event::ePress:
         {
-            if (!_tapTempoMode) {
+            if (!_tempo.tapMode) {
                 _sync.lastPressMs = _mesh->timeMs();
                 _sync.lastPressId = _mesh->nodeId();
                 _sync.randomizer  = (Rnd)random();
@@ -245,9 +260,10 @@ void Scarf::processEvent(const ObservableButton::Event& event)
         case ObservableButton::Event::eLongPress:
         {
             if (kTapTempoOnLongPress) {
-                _tapTempoMode = !_tapTempoMode;
-                if (!_tapTempoMode) _tapTempo.reset();
-                Scarfnet::log("eLongPress → tap-tempo %s", _tapTempoMode ? "ON" : "OFF");
+                if (_tempo.tapMode) _tempo.exitTapMode();
+                else                _tempo.enterTapMode();
+                Scarfnet::log("eLongPress → tap-tempo %s ti=%u",
+                    _tempo.tapMode ? "ON" : "OFF", _tempo.index);
             } else {
                 // Original behaviour: same pattern, new randomizer.
                 _sync.lastPressMs = _mesh->timeMs();
@@ -308,10 +324,10 @@ void Scarf::showBuiltInLED()
     IndicatorState state {
         .alarmActive      = _unknownPatternAlarm.isActive(now),
         .alarmOn          = _unknownPatternAlarm.isOn(now),
-        .tapTempoMode     = _tapTempoMode,
-        .tempoActive      = _tapTempo.isActive(),
-        .beatIntervalMs   = _tapTempo.beatIntervalMs(),
-        .beatPhaseMs      = _tapTempo.beatPhaseMs(_timeMsec),
+        .tapTempoMode     = _tempo.tapMode,
+        .tempoActive      = _tempo.tempo.isActive(),
+        .beatIntervalMs   = _tempo.tempo.beatIntervalMs(),
+        .beatPhaseMs      = _tempo.tempo.beatPhaseMs(_timeMsec),
         .meshTimeMs       = _timeMsec,
         .newerVersionSeen = _newerVersionSeen,
     };
@@ -331,7 +347,7 @@ void Scarf::showLEDs()
     _patternManager->runCurrentPattern(
         _ledsReal, 
         _mesh->timeMs(), 
-        _tapTempo.beatInfo(_timeMsec),
+        _tempo.tempo.beatInfo(_timeMsec),
         nodeInfo);
 }
 

@@ -88,6 +88,13 @@ void Mesh::update() {
         handleReceived(entry.mac, entry.data, entry.len);
     }
 
+    portENTER_CRITICAL(&_rxMux);
+    uint32_t dropped = _rxDropped;
+    _rxDropped = 0;
+    portEXIT_CRITICAL(&_rxMux);
+    if (dropped)
+        Scarfnet::log("[MESH] rx queue full — %u packet(s) dropped", (unsigned)dropped);
+
     _tracker.checkTimeouts(millis(), kNodeTimeoutMs, [this](NodeId nodeId) {
         Scarfnet::log("[MESH] node %u timed out (peers: %u)", nodeId, (unsigned)_tracker.count());
         if (_leftCb) _leftCb(nodeId);
@@ -110,9 +117,9 @@ void Mesh::update() {
         slot.len      = copyLen;
         self->_rxHead = next;
     } else {
-        // Queue full; this packet is dropped. At 5-second heartbeat intervals
-        // with 16 nodes, the queue should never fill.
-        Scarfnet::log("[MESH] rx queue full — packet dropped");
+        // Queue full; this packet is dropped. Counted here and logged from
+        // update() — logging (Serial) is unsafe inside this critical section.
+        ++self->_rxDropped;
     }
     portEXIT_CRITICAL(&self->_rxMux);
 }
@@ -138,9 +145,9 @@ void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
     bool isNew = _tracker.saw(nodeId, now);
     updateClock(pkt.currentTimeMs);
 
-    Scarfnet::log("[MESH][RCV node %u] ver=%u pattern=%s ci=%u rnd=%u beat=%u/%u peerTime=%u myTime=%u",
+    Scarfnet::log("[MESH][RCV node %u] ver=%u pattern=%s ci=%u rnd=%u ti=%u beat=%u/%u peerTime=%u myTime=%u",
                   nodeId, pkt.version, pkt.pattern, pkt.changeIndex, pkt.globalRandomizer,
-                  pkt.beatIntervalMs, pkt.beatPhaseMs, pkt.currentTimeMs, timeMs());
+                  pkt.tempoIndex, pkt.beatIntervalMs, pkt.beatPhaseMs, pkt.currentTimeMs, timeMs());
 
     if (isNew) {
         Scarfnet::log("[MESH] node %u joined (peers: %u)", nodeId, (unsigned)_tracker.count());
