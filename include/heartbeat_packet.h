@@ -18,7 +18,7 @@ namespace Scarfnet {
 //
 //  off   0           4           8    10   12              16          20          24            28          32
 //        +-----------+-----------+----+----+---------------+-----------+-----------+-------------+-----------+
-//        |    id     | scarfNetId|ver |rsv |     crc32     |currentTime| lastPress | lastPressId |changeIndex|
+//        |    id     | scarfNetId|ver |tmpo|     crc32     |currentTime| lastPress | lastPressId |changeIndex|
 //        |  (uint32) | (uint32)  |u16 |u16 |   (uint32)    | (uint32)  | (uint32)  |  (uint32)   | (uint32)  |
 //        +-----------+-----------+----+----+---------------+-----------+-----------+-------------+-----------+
 //           4 B          4 B     2 B  2 B       4 B             4 B        4 B           4 B          4 B
@@ -41,7 +41,7 @@ struct __attribute__((packed)) HeartbeatPacket {
     NodeId      id;               // sender node ID (last 4 MAC bytes cast to uint32)
     ScarfNetId  scarfNetId;       // logical network ID; receivers drop mismatched packets
     uint16_t    version;          // firmware version (kScarfVersion from config.h)
-    uint16_t    _reserved;        // reserved for future use
+    uint16_t    tempoIndex;       // version of the tap-tempo state (see tempo_sync.h)
     uint32_t    crc32;            // CRC-32 over full struct with this field zeroed
     TimeMs      currentTimeMs;    // sender's synchronized clock (millis() + EMA offset)
     TimeMs      lastPressMs;      // synchronized time of last button press on sender

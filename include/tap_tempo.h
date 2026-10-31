@@ -7,8 +7,7 @@
 //   reset()                  — call when exiting tap-tempo mode
 //
 // On receiving scarves:
-//   followPacket(...)        — call on every heartbeat; applies the follow rule
-//   setFromPacket(...)       — unconditionally adopt a peer's tempo
+//   setFromPacket(...)       — adopt a peer's tempo (TempoSync decides when)
 //
 // Any scarf:
 //   beatIntervalMs()         — beat period in ms; 0 = not active
@@ -78,27 +77,6 @@ struct TapTempo {
         _active      = true;
         _sampleCount = 0;  // no local tap history; interval comes from the wire
         _sampleHead  = 0;
-    }
-
-    // True if this scarf has been tapped within the last kMaxGapMs — it's the
-    // tempo authority and should ignore peers' tempo.
-    bool isLocallyTapping(TimeMs now) const {
-        return _hasTapped && (now - _lastTapMs) < kMaxGapMs;
-    }
-
-    // Apply a peer heartbeat's tempo fields. Follows the peer's beat unless we're
-    // actively tapping; when the peer has no tempo, clears ours unless we're in
-    // tap-tempo mode (so entering the mode doesn't immediately lose the tempo).
-    // Idle in tap-tempo mode — including before the first tap — we still follow,
-    // so a second scarf entering tap-tempo inherits the current tempo.
-    void followPacket(uint16_t intervalMs, TimeMs pktCurrentTimeMs, uint16_t pktBeatPhaseMs,
-                      bool inTapMode, TimeMs now) {
-        if (intervalMs != 0) {
-            if (!isLocallyTapping(now))
-                setFromPacket(intervalMs, pktCurrentTimeMs, pktBeatPhaseMs);
-        } else if (!inTapMode) {
-            reset();
-        }
     }
 
     void reset() {

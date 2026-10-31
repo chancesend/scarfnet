@@ -201,46 +201,6 @@ void test_tap_tempo_set_from_packet_phase_wraps() {
 
 // ---------------------------------------------------------------------------
 
-// ─── followPacket: the per-heartbeat follow rule ─────────────────────────────
-
-void test_tap_tempo_follow_adopts_peer_tempo_when_idle() {
-    TapTempo tt;
-    tt.followPacket(500, 10000, 0, /*inTapMode=*/false, 10000);
-    TEST_ASSERT_TRUE(tt.isActive());
-    TEST_ASSERT_EQUAL_UINT16(500, tt.beatIntervalMs());
-}
-
-void test_tap_tempo_follow_ignores_peer_while_locally_tapping() {
-    TapTempo tt;
-    tt.tap(1000);
-    tt.tap(1600);  // 600 ms tempo, we're the authority
-    tt.followPacket(500, 2000, 0, /*inTapMode=*/true, 2000);
-    TEST_ASSERT_EQUAL_UINT16(600, tt.beatIntervalMs());
-}
-
-void test_tap_tempo_follow_resumes_after_tap_gap() {
-    TapTempo tt;
-    tt.tap(1000);
-    tt.tap(1600);
-    TimeMs later = 1600 + TapTempo::kMaxGapMs;  // stopped tapping
-    tt.followPacket(500, later, 0, /*inTapMode=*/true, later);
-    TEST_ASSERT_EQUAL_UINT16(500, tt.beatIntervalMs());
-}
-
-void test_tap_tempo_follow_peer_without_tempo_clears_ours() {
-    TapTempo tt;
-    tt.setFromPacket(500, 1000, 0);
-    tt.followPacket(0, 2000, 0, /*inTapMode=*/false, 2000);
-    TEST_ASSERT_FALSE(tt.isActive());
-}
-
-void test_tap_tempo_follow_peer_without_tempo_kept_in_tap_mode() {
-    TapTempo tt;
-    tt.setFromPacket(500, 1000, 0);
-    tt.followPacket(0, 2000, 0, /*inTapMode=*/true, 2000);
-    TEST_ASSERT_TRUE(tt.isActive());
-}
-
 void tap_tempo_tests() {
     RUN_TEST(test_tap_tempo_initial_not_active);
     RUN_TEST(test_tap_tempo_single_tap_not_active);
@@ -263,9 +223,4 @@ void tap_tempo_tests() {
     RUN_TEST(test_tap_tempo_set_from_packet_becomes_active);
     RUN_TEST(test_tap_tempo_set_from_packet_phase_correct);
     RUN_TEST(test_tap_tempo_set_from_packet_phase_wraps);
-    RUN_TEST(test_tap_tempo_follow_adopts_peer_tempo_when_idle);
-    RUN_TEST(test_tap_tempo_follow_ignores_peer_while_locally_tapping);
-    RUN_TEST(test_tap_tempo_follow_resumes_after_tap_gap);
-    RUN_TEST(test_tap_tempo_follow_peer_without_tempo_clears_ours);
-    RUN_TEST(test_tap_tempo_follow_peer_without_tempo_kept_in_tap_mode);
 }

@@ -306,8 +306,9 @@ void test_classify_older_index_different_pattern_rejected_differing()
 
 void test_build_heartbeat_fills_all_fields()
 {
-    Scarfnet::TapTempo tempo;
-    tempo.setFromPacket(500, 10000, 100);  // last beat at 9900
+    Scarfnet::TempoSync tempo;
+    tempo.tempo.setFromPacket(500, 10000, 100);  // last beat at 9900
+    tempo.index = 17;
     Scarfnet::SyncState sync = {6, 5000, 42, 0xBEEF};
 
     Scarfnet::HeartbeatPacket pkt =
@@ -321,6 +322,7 @@ void test_build_heartbeat_fills_all_fields()
     TEST_ASSERT_EQUAL_UINT32(42u, pkt.lastPressId);
     TEST_ASSERT_EQUAL_HEX16(0xBEEF, pkt.globalRandomizer);
     TEST_ASSERT_EQUAL_STRING("fractal", pkt.pattern);
+    TEST_ASSERT_EQUAL_UINT16(17, pkt.tempoIndex);
     TEST_ASSERT_EQUAL_UINT16(500, pkt.beatIntervalMs);
     TEST_ASSERT_EQUAL_UINT16(300, pkt.beatPhaseMs);  // (10200 - 9900) % 500
 }

@@ -10,6 +10,7 @@
 #include "patterns.h"
 #include "PatternManager.h"
 #include "tap_tempo.h"
+#include "tempo_sync.h"
 
 #include <TaskScheduler.h>
 #include <Arduino.h>
@@ -67,8 +68,8 @@ private:
     ObservableButton _nextPatternButton;
     bool             _onFlag        {false};
 
-    TapTempo _tapTempo;
-    bool     _tapTempoMode     {false};  // true = long-press entered tap-tempo input mode
+    // Tap tempo plus its replicated version and tap-mode flag. See tempo_sync.h.
+    TempoSync _tempo;
     bool     _newerVersionSeen {false};  // true if any peer has a higher firmware version
     // Triggered when a peer tells us to switch to a pattern we don't have;
     // flashes the built-in LED red. Timed on local millis().

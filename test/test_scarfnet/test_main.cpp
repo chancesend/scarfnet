@@ -12,6 +12,7 @@
 #include "swarm/test_swarm_ema.h"
 #include "sync/test_sync.h"
 #include "tap_tempo/test_tap_tempo.h"
+#include "tempo_sync/test_tempo_sync.h"
 #include "transition/test_transition.h"
 
 void setUp(void) {
@@ -42,6 +43,7 @@ int main( int argc, char **argv) {
     swarm_ema_tests();
     sync_tests();
     tap_tempo_tests();
+    tempo_sync_tests();
     transition_tests();
     
     UNITY_END();

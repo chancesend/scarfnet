@@ -6,14 +6,14 @@
 #include "config.h"           // kScarfVersion
 #include "heartbeat_packet.h"
 #include "sync_state.h"
-#include "tap_tempo.h"
+#include "tempo_sync.h"
 
 #include <string>
 
 namespace Scarfnet {
 
 inline HeartbeatPacket buildHeartbeat(NodeId id, TimeMs now, const SyncState& sync,
-                                      const std::string& pattern, const TapTempo& tapTempo)
+                                      const std::string& pattern, const TempoSync& tempo)
 {
     HeartbeatPacket pkt = {};
     pkt.id             = id;
@@ -21,8 +21,9 @@ inline HeartbeatPacket buildHeartbeat(NodeId id, TimeMs now, const SyncState& sy
     pkt.currentTimeMs  = now;
     writeSyncState(pkt, sync);
     setPatternName(pkt, pattern);
-    pkt.beatIntervalMs = tapTempo.beatIntervalMs();
-    pkt.beatPhaseMs    = tapTempo.beatPhaseMs(now);
+    pkt.tempoIndex     = tempo.index;
+    pkt.beatIntervalMs = tempo.tempo.beatIntervalMs();
+    pkt.beatPhaseMs    = tempo.tempo.beatPhaseMs(now);
     return pkt;
 }
 
