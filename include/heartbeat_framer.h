@@ -13,6 +13,7 @@
 
 #include "heartbeat_packet.h"
 
+#include <cstddef>
 #include <cstring>
 #include <cstdint>
 
@@ -30,18 +31,34 @@ struct HeartbeatFramer {
         return crc ^ 0xFFFFFFFFu;
     }
 
+    // Largest packet ESP-NOW can deliver.
+    static constexpr int kMaxWireLen = 250;
+
+    // CRC-32 over the first `len` wire bytes with the crc32 field zeroed.
+    static uint32_t wireCrc(const uint8_t* data, int len) {
+        uint8_t buf[kMaxWireLen];
+        memcpy(buf, data, (size_t)len);
+        memset(buf + offsetof(HeartbeatPacket, crc32), 0, sizeof(uint32_t));
+        return crc32(buf, (size_t)len);
+    }
+
     // Decode raw bytes into `out`. Returns false if the packet is too short or
     // the CRC-32 does not match. Leaves `out` zeroed on failure.
+    //
+    // Forward-compatible: a newer firmware may append fields. Such a packet is
+    // accepted if its CRC covers either our struct size (as we send) or the
+    // whole received length (a newer sender covering its extra fields); only
+    // the fields we know are decoded, the rest is ignored.
     static bool decode(const uint8_t* data, int len, HeartbeatPacket& out) {
         if (len < (int)sizeof(HeartbeatPacket)) return false;
         memcpy(&out, data, sizeof(HeartbeatPacket));
 
-        // Verify CRC against the unmodified copy before touching any fields.
+        // Verify CRC against the raw bytes before touching any fields.
         uint32_t received = out.crc32;
-        out.crc32 = 0;
-        bool ok = (crc32(reinterpret_cast<const uint8_t*>(&out), sizeof(out)) == received);
+        bool ok = wireCrc(data, (int)sizeof(HeartbeatPacket)) == received ||
+                  (len > (int)sizeof(HeartbeatPacket) && len <= kMaxWireLen &&
+                   wireCrc(data, len) == received);
         if (!ok) { memset(&out, 0, sizeof(out)); return false; }
-        out.crc32 = received;
 
         out.pattern[sizeof(out.pattern) - 1] = '\0';  // guard unterminated data
         return true;

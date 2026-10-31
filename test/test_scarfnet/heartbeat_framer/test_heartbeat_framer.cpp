@@ -85,6 +85,42 @@ void test_framer_decode_larger_buffer_succeeds()
     TEST_ASSERT_EQUAL_STRING("colorwaves", out.pattern);
 }
 
+// A packet from a hypothetical newer firmware that appended 10 bytes and
+// computed its CRC over the full length.
+static int makeFuturePacket(uint8_t* buf)
+{
+    HeartbeatPacket src = {};
+    src.id = 0xCAFEF00D;
+    src.changeIndex = 99;
+    memcpy(src.pattern, "fractal", 8);
+    memcpy(buf, &src, sizeof(src));
+    const int len = (int)sizeof(src) + 10;
+    for (int i = (int)sizeof(src); i < len; ++i) buf[i] = (uint8_t)(0xA0 + i);
+    uint32_t crc = HeartbeatFramer::wireCrc(buf, len);
+    memcpy(buf + offsetof(HeartbeatPacket, crc32), &crc, sizeof(crc));
+    return len;
+}
+
+void test_framer_decode_accepts_newer_longer_packet()
+{
+    uint8_t buf[250] = {};
+    int len = makeFuturePacket(buf);
+    HeartbeatPacket out = {};
+    TEST_ASSERT_TRUE(HeartbeatFramer::decode(buf, len, out));
+    TEST_ASSERT_EQUAL_UINT32(0xCAFEF00D, out.id);
+    TEST_ASSERT_EQUAL_UINT32(99, out.changeIndex);
+    TEST_ASSERT_EQUAL_STRING("fractal", out.pattern);
+}
+
+void test_framer_decode_rejects_newer_packet_with_corrupt_extension()
+{
+    uint8_t buf[250] = {};
+    int len = makeFuturePacket(buf);
+    buf[len - 1] ^= 0xFF;  // corrupt a byte we don't even decode
+    HeartbeatPacket out = {};
+    TEST_ASSERT_FALSE(HeartbeatFramer::decode(buf, len, out));
+}
+
 void test_framer_decode_null_terminates_unterminated_pattern()
 {
     // Simulate a packet whose pattern field has no null terminator but a valid CRC.
@@ -243,6 +279,8 @@ void heartbeat_framer_tests()
     RUN_TEST(test_framer_decode_empty_packet_returns_false);
     RUN_TEST(test_framer_decode_exact_size_succeeds);
     RUN_TEST(test_framer_decode_larger_buffer_succeeds);
+    RUN_TEST(test_framer_decode_accepts_newer_longer_packet);
+    RUN_TEST(test_framer_decode_rejects_newer_packet_with_corrupt_extension);
     RUN_TEST(test_framer_decode_null_terminates_unterminated_pattern);
     RUN_TEST(test_framer_decode_rejects_corrupt_data);
     RUN_TEST(test_framer_decode_rejects_wrong_crc);
