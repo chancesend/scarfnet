@@ -13,6 +13,8 @@
 namespace Scarfnet
 {
 
+// Persisted in NVS under the "scarfNet" namespace and survives USB/OTA firmware
+// updates. Renaming the key or namespace silently resets every scarf's LED type.
 static const char* const kLedTypeString = "ledType";
 
 Scarf::Scarf() :
