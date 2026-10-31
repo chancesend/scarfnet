@@ -138,9 +138,9 @@ void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
     bool isNew = _tracker.saw(nodeId, now);
     updateClock(pkt.currentTimeMs);
 
-    Scarfnet::log("[MESH][RCV node %u] ver=%u pattern=%s ci=%u rnd=%u peerTime=%u myTime=%u",
+    Scarfnet::log("[MESH][RCV node %u] ver=%u pattern=%s ci=%u rnd=%u beat=%u/%u peerTime=%u myTime=%u",
                   nodeId, pkt.version, pkt.pattern, pkt.changeIndex, pkt.globalRandomizer,
-                  pkt.currentTimeMs, timeMs());
+                  pkt.beatIntervalMs, pkt.beatPhaseMs, pkt.currentTimeMs, timeMs());
 
     if (isNew) {
         Scarfnet::log("[MESH] node %u joined (peers: %u)", nodeId, (unsigned)_tracker.count());
@@ -153,24 +153,29 @@ void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
 // ─── Clock sync ─────────────────────────────────────────────────────────────
 
 void Mesh::updateClock(TimeMs pktCurrentTimeMs) {
-    int32_t rawDelta  = (int32_t)pktCurrentTimeMs - (int32_t)millis();
-    bool    wasWarmed = _clock.isWarmedUp();
-    _clock.update(pktCurrentTimeMs, millis());
+    TimeMs  localMs   = millis();
+    int32_t rawDelta  = (int32_t)pktCurrentTimeMs - (int32_t)localMs;
+    float   before    = _clock.offset;
+    auto    action    = _clock.classify(pktCurrentTimeMs, localMs);
+    _clock.update(pktCurrentTimeMs, localMs);
 
-    if (!wasWarmed) {
-        Scarfnet::log("[SYNC] warmup %d/%d offset=%dms",
-                      _clock.samples, kClockWarmupSamples, rawDelta);
-        return;
+    switch (action) {
+        case ClockSync::Action::Warmup:
+            Scarfnet::log("[SYNC] warmup %d/%d offset=%dms",
+                          _clock.samples, kClockWarmupSamples, rawDelta);
+            break;
+        case ClockSync::Action::JumpAhead:
+            Scarfnet::log("[SYNC] peer clock %.0fms ahead — jumping to it",
+                          (float)rawDelta - before);
+            break;
+        case ClockSync::Action::IgnoreBehind:
+            Scarfnet::log("[SYNC] peer clock %.0fms behind — ignored (it will jump to ours)",
+                          before - (float)rawDelta);
+            break;
+        case ClockSync::Action::Track:
+            Scarfnet::log("[SYNC] offset=%.0fms raw=%dms", _clock.offset, rawDelta);
+            break;
     }
-
-    float deviation = fabsf((float)rawDelta - _clock.offset);
-    if (deviation > (float)kSwarmMaxClockDeviationMs) {
-        Scarfnet::log("[SYNC] deviation=%.0fms exceeds ±%dms — discarded",
-                      deviation, kSwarmMaxClockDeviationMs);
-        return;
-    }
-
-    Scarfnet::log("[SYNC] offset=%.0fms raw=%dms", _clock.offset, rawDelta);
 }
 
 // ─── Send ───────────────────────────────────────────────────────────────────

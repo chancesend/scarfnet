@@ -102,19 +102,85 @@ void test_clock_sync_ema_does_not_hard_set_after_warmup()
 // Outlier rejection after warmup
 // ---------------------------------------------------------------------------
 
-void test_clock_sync_outlier_rejected_after_warmup()
+void test_clock_sync_far_behind_sample_ignored_after_warmup()
 {
     ClockSync cs;
-    // Warmup: establish offset = 1000
+    // Warmup: establish offset = 10000
     for (int i = 0; i < kClockWarmupSamples; ++i) {
-        cs.update(1000, 0);
+        cs.update(10000, 0);
     }
     float before = cs.offset;
 
-    // Sample deviates by kSwarmMaxClockDeviationMs + 1 — must be discarded
-    uint32_t outlierPeerTime = 1000 + (uint32_t)kSwarmMaxClockDeviationMs + 1;
-    cs.update(outlierPeerTime, 0);
+    // Sample behind by more than kSwarmMaxClockDeviationMs — ignored
+    uint32_t behindPeerTime = 10000 - (uint32_t)kSwarmMaxClockDeviationMs - 1;
+    cs.update(behindPeerTime, 0);
     TEST_ASSERT_FLOAT_WITHIN(0.1f, before, cs.offset);
+    TEST_ASSERT_TRUE(cs.isWarmedUp());
+}
+
+void test_clock_sync_far_ahead_sample_jumps_to_it()
+{
+    ClockSync cs;
+    for (int i = 0; i < kClockWarmupSamples; ++i) {
+        cs.update(1000, 0);  // offset = 1000
+    }
+    // Sample ahead by more than the limit: hard-set to it, stay warmed up
+    uint32_t aheadPeerTime = 1000 + (uint32_t)kSwarmMaxClockDeviationMs + 1;
+    cs.update(aheadPeerTime, 0);
+    TEST_ASSERT_FLOAT_WITHIN(0.1f, (float)aheadPeerTime, cs.offset);
+    TEST_ASSERT_TRUE(cs.isWarmedUp());
+}
+
+void test_clock_sync_after_jump_behind_domain_cannot_drag_back()
+{
+    // Just jumped to the ahead domain; next heartbeat is from a behind-domain
+    // peer that hasn't jumped yet. It must be ignored, not re-adopted.
+    ClockSync cs;
+    for (int i = 0; i < kClockWarmupSamples; ++i) cs.update(1000, 0);
+    cs.update(1000000, 0);  // jump ahead
+    cs.update(1000, 0);     // old domain
+    TEST_ASSERT_FLOAT_WITHIN(0.1f, 1000000.0f, cs.offset);
+}
+
+// The field split: two groups warmed up on each other ~4879 s apart. Every
+// scarf must end up on the furthest-ahead clock, and stay there.
+void test_clock_sync_two_warmed_domains_merge_on_ahead_clock()
+{
+    const uint32_t kGap = 4879000u;
+    ClockSync behind, ahead;
+    // Each local millis() is 100000; behind group's network time 558000,
+    // ahead group's network time 558000 + kGap.
+    for (int i = 0; i < kClockWarmupSamples; ++i) {
+        behind.update(558000u, 100000u);
+        ahead.update(558000u + kGap, 100000u);
+    }
+
+    // Exchange heartbeats for a few rounds (5 s apart).
+    for (uint32_t r = 1; r <= 4; ++r) {
+        uint32_t local = 100000u + r * 5000u;
+        uint32_t tBehind = behind.timeMs(local);
+        uint32_t tAhead  = ahead.timeMs(local);
+        behind.update(tAhead, local);
+        ahead.update(tBehind, local);
+    }
+
+    uint32_t local = 100000u + 5u * 5000u;
+    int32_t gap = (int32_t)(ahead.timeMs(local) - behind.timeMs(local));
+    TEST_ASSERT_INT32_WITHIN(5, 0, gap);
+    TEST_ASSERT_EQUAL_UINT32(558000u + kGap + 5u * 5000u, ahead.timeMs(local));  // ahead never moved
+    TEST_ASSERT_TRUE(behind.isWarmedUp());
+}
+
+void test_clock_sync_classify_matches_update()
+{
+    ClockSync cs;
+    TEST_ASSERT_TRUE(cs.classify(1000, 0) == ClockSync::Action::Warmup);
+    for (int i = 0; i < kClockWarmupSamples; ++i) cs.update(10000, 0);
+    TEST_ASSERT_TRUE(cs.classify(10100, 0) == ClockSync::Action::Track);
+    TEST_ASSERT_TRUE(cs.classify(10000 + kSwarmMaxClockDeviationMs + 1, 0)
+                     == ClockSync::Action::JumpAhead);
+    TEST_ASSERT_TRUE(cs.classify(10000 - kSwarmMaxClockDeviationMs - 1, 0)
+                     == ClockSync::Action::IgnoreBehind);
 }
 
 void test_clock_sync_sample_at_exact_deviation_limit_accepted()
@@ -174,9 +240,88 @@ void test_clock_sync_fresh_boot_converges_to_peer()
 }
 
 // ---------------------------------------------------------------------------
+// Slewing: small corrections play out gradually; hard-sets apply at once
+// ---------------------------------------------------------------------------
+
+static void warmAtZero(ClockSync& cs)
+{
+    for (int i = 0; i < kClockWarmupSamples; ++i) cs.update(0, 0);  // offset 0 at local 0
+}
+
+void test_clock_sync_small_correction_slews_not_skips()
+{
+    ClockSync cs;
+    warmAtZero(cs);
+    cs.update(11000, 10000);  // peer 1000 ms ahead → target 400
+    TEST_ASSERT_FLOAT_WITHIN(1.0f, 400.0f, cs.offset);
+
+    // Right after the sample the displayed clock hasn't moved...
+    TEST_ASSERT_EQUAL_UINT32(10000, cs.timeMs(10000));
+    // ...then gains kClockSlewRate ms per ms until it reaches the target.
+    TEST_ASSERT_EQUAL_UINT32(10100 + (uint32_t)(100 * kClockSlewRate), cs.timeMs(10100));
+    uint32_t reachedAt = 10000 + (uint32_t)(400 / kClockSlewRate);
+    TEST_ASSERT_EQUAL_UINT32(reachedAt + 400, cs.timeMs(reachedAt));
+    TEST_ASSERT_EQUAL_UINT32(reachedAt + 1000 + 400, cs.timeMs(reachedAt + 1000));
+}
+
+void test_clock_sync_negative_correction_never_runs_backward()
+{
+    ClockSync cs;
+    warmAtZero(cs);
+    uint32_t prev = cs.timeMs(9990);  // just before the correction arrives
+    cs.update(10000 - 4000, 10000);  // peer 4000 ms behind (within limit) → target -1600
+    TEST_ASSERT_TRUE_MESSAGE(cs.timeMs(10000) >= prev, "synced clock ran backward");
+    prev = cs.timeMs(10000);
+    for (uint32_t t = 10010; t < 20000; t += 10) {
+        uint32_t now = cs.timeMs(t);
+        TEST_ASSERT_TRUE_MESSAGE(now >= prev, "synced clock ran backward");
+        prev = now;
+    }
+    TEST_ASSERT_EQUAL_UINT32(20000 - 1600, cs.timeMs(20000));
+}
+
+void test_clock_sync_max_slewed_gap_closes_within_10s()
+{
+    // Worst case: displayed offset 5 s from target. Build it by hard-setting
+    // the slew start, then moving the target with in-range samples.
+    ClockSync cs;
+    warmAtZero(cs);
+    for (int i = 0; i < 20; ++i) cs.update(5000, 0);  // same instant: target → ~5000, display 0
+    TEST_ASSERT_FLOAT_WITHIN(5.0f, 5000.0f, cs.offset);
+    TEST_ASSERT_EQUAL_UINT32(0, cs.timeMs(0));
+    uint32_t closesBy = (uint32_t)(5000 / kClockSlewRate);
+    TEST_ASSERT_TRUE(closesBy <= 10000);
+    TEST_ASSERT_INT32_WITHIN(5, (int32_t)(closesBy + 5000), (int32_t)cs.timeMs(closesBy));
+}
+
+void test_clock_sync_new_sample_mid_slew_continues_smoothly()
+{
+    ClockSync cs;
+    warmAtZero(cs);
+    cs.update(11000, 10000);           // target 400
+    uint32_t before = cs.timeMs(10200);  // mid-slew: +100
+    cs.update(11200, 10200);           // another sample mid-slew
+    uint32_t after = cs.timeMs(10200);
+    TEST_ASSERT_EQUAL_UINT32(before, after);  // no skip at the instant of the update
+}
+
+void test_clock_sync_jump_ahead_is_immediate()
+{
+    ClockSync cs;
+    warmAtZero(cs);
+    cs.update(1000000, 10000);  // far ahead → hard jump
+    TEST_ASSERT_EQUAL_UINT32(1000000, cs.timeMs(10000));
+}
+
+// ---------------------------------------------------------------------------
 
 void clock_sync_tests()
 {
+    RUN_TEST(test_clock_sync_small_correction_slews_not_skips);
+    RUN_TEST(test_clock_sync_negative_correction_never_runs_backward);
+    RUN_TEST(test_clock_sync_max_slewed_gap_closes_within_10s);
+    RUN_TEST(test_clock_sync_new_sample_mid_slew_continues_smoothly);
+    RUN_TEST(test_clock_sync_jump_ahead_is_immediate);
     RUN_TEST(test_clock_sync_warmup_first_sample_sets_offset);
     RUN_TEST(test_clock_sync_warmup_overwrites_on_each_sample);
     RUN_TEST(test_clock_sync_warmup_completes_at_threshold);
@@ -184,7 +329,11 @@ void clock_sync_tests()
     RUN_TEST(test_clock_sync_time_ms_negative_offset);
     RUN_TEST(test_clock_sync_ema_converges_toward_peer);
     RUN_TEST(test_clock_sync_ema_does_not_hard_set_after_warmup);
-    RUN_TEST(test_clock_sync_outlier_rejected_after_warmup);
+    RUN_TEST(test_clock_sync_far_behind_sample_ignored_after_warmup);
+    RUN_TEST(test_clock_sync_far_ahead_sample_jumps_to_it);
+    RUN_TEST(test_clock_sync_after_jump_behind_domain_cannot_drag_back);
+    RUN_TEST(test_clock_sync_two_warmed_domains_merge_on_ahead_clock);
+    RUN_TEST(test_clock_sync_classify_matches_update);
     RUN_TEST(test_clock_sync_sample_at_exact_deviation_limit_accepted);
     RUN_TEST(test_clock_sync_handles_uint32_rollover);
     RUN_TEST(test_clock_sync_fresh_boot_converges_to_peer);

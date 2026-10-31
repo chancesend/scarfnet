@@ -7,7 +7,7 @@
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and used in the OTA SSID/info endpoint.
 // Version 100 = 1.00, version 102 = 1.02, etc
-const uint16_t kScarfVersion              = 109;
+const uint16_t kScarfVersion              = 111;
 
 // ── ObservableButton ─────────────────────────────────────────────────────────
 const uint32_t kButtonPollIntervalMs       = 50;
@@ -85,10 +85,17 @@ const uint32_t kNodeTimeoutMs             = 15000;
 // After warmup, the EMA (kSwarmEmaAlpha from swarm_ema.h) takes over.
 const int      kClockWarmupSamples        = 3;
 
-// Samples whose deviation from the current estimate exceeds this bound are
-// discarded. Guards against corrupted packets and extreme clock jumps after
-// warmup has established a baseline.
+// After warmup, a sample further than this from our estimate is from another
+// clock domain: we jump to it if it is ahead, ignore it if it is behind, so all
+// scarves converge on the furthest-ahead clock (see clock_sync.h).
 const int32_t  kSwarmMaxClockDeviationMs  = 5000;
+
+// Corrections within kSwarmMaxClockDeviationMs are slewed rather than applied
+// at once: the synced clock runs at most this much faster or slower than real
+// time (0.5 → between 0.5× and 1.5× speed) until it reaches the target. The
+// largest slewed gap (5 s) therefore closes in 10 s; the clock never runs
+// backward. Larger gaps hard-jump (see clock_sync.h).
+const float    kClockSlewRate             = 0.5f;
 
 // ── OTA ──────────────────────────────────────────────────────────────────────
 const int      kOtaHoldMs                 = 5000;
