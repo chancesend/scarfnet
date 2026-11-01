@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mesh_types.h" // TimeMs
+#include "mesh_types.h"
 #include "patterns.h"
 #include "palettes.h"
 #include "config.h"

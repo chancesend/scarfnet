@@ -1,6 +1,6 @@
 #include "Mesh.h"
 
-#ifdef SCARFNET_EMBEDDED
+#if SCARFNET_EMBEDDED
 
 #include "config.h"
 #include "clock_sync.h"
@@ -10,7 +10,6 @@
 #include <esp_wifi.h>
 #include <Arduino.h>
 #include <cstring>
-#include <cmath>
 
 namespace Scarfnet {
 
@@ -50,8 +49,9 @@ void Mesh::begin() {
     esp_wifi_set_channel(kEspNowChannel, WIFI_SECOND_CHAN_NONE);
 
     if (esp_now_init() != ESP_OK) {
-        Scarfnet::log("[MESH] esp_now_init() FAILED");
-        while (true) delay(1000);
+        Scarfnet::log("[MESH] esp_now_init() FAILED — restarting");
+        delay(kEspNowInitFailRestartMs);
+        ESP.restart();
     }
 
     esp_now_register_recv_cb(Mesh::espNowRecvCb);
@@ -112,7 +112,7 @@ void Mesh::update() {
     if (next != self->_rxTail) {
         RxEntry& slot = self->_rxQueue[self->_rxHead];
         memcpy(slot.mac,  mac,  6);
-        int copyLen = len < 250 ? len : 250;
+        int copyLen = len < HeartbeatFramer::kMaxWireLen ? len : HeartbeatFramer::kMaxWireLen;
         memcpy(slot.data, data, copyLen);
         slot.len      = copyLen;
         self->_rxHead = next;
@@ -129,13 +129,15 @@ void Mesh::update() {
 void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
     HeartbeatPacket pkt = {};
     if (!HeartbeatFramer::decode(data, len, pkt)) {
-        Scarfnet::log("[MESH][RCV] short packet (%d bytes) — ignoring", len);
+        if (kVerboseLogging)
+            Scarfnet::log("[MESH][RCV] invalid packet (%d bytes) — ignoring", len);
         return;
     }
 
     if (pkt.scarfNetId != _scarfNetId) {
-        Scarfnet::log("[MESH][RCV] scarfNetId mismatch (got %u, ours %u) — dropped",
-                      pkt.scarfNetId, _scarfNetId);
+        if (kVerboseLogging)
+            Scarfnet::log("[MESH][RCV] scarfNetId mismatch (got %u, ours %u) — dropped",
+                          pkt.scarfNetId, _scarfNetId);
         return;
     }
 
@@ -145,12 +147,13 @@ void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
     bool isNew = _tracker.saw(nodeId, now);
     updateClock(pkt.currentTimeMs);
 
-    Scarfnet::log("[MESH][RCV node %u] ver=%u pattern=%s ci=%u rnd=%u ti=%u beat=%u/%u peerTime=%u myTime=%u",
-                  nodeId, pkt.version, pkt.pattern, pkt.changeIndex, pkt.globalRandomizer,
-                  pkt.tempoIndex, pkt.beatIntervalMs, pkt.beatPhaseMs, pkt.currentTimeMs, timeMs());
+    if (kVerboseLogging)
+        Scarfnet::log("[MESH][RCV node %u] ver=%u pattern=%s ci=%u rnd=%u ti=%u beat=%u/%u peerTime=%u myTime=%u",
+                      nodeId, pkt.version, pkt.pattern, pkt.changeIndex, pkt.globalRandomizer,
+                      pkt.tempoIndex, pkt.beatIntervalMs, pkt.beatPhaseMs, pkt.currentTimeMs, timeMs());
 
     if (isNew) {
-        Scarfnet::log("[MESH] node %u joined (peers: %u)", nodeId, (unsigned)_tracker.count());
+        Scarfnet::log("[MESH] node %u joined ver=%u (peers: %u)", nodeId, pkt.version, (unsigned)_tracker.count());
         if (_joinedCb) _joinedCb(nodeId);
     }
 
@@ -160,13 +163,11 @@ void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
 // ─── Clock sync ─────────────────────────────────────────────────────────────
 
 void Mesh::updateClock(TimeMs pktCurrentTimeMs) {
-    TimeMs  localMs   = millis();
-    int32_t rawDelta  = (int32_t)pktCurrentTimeMs - (int32_t)localMs;
-    float   before    = _clock.offset;
-    auto    action    = _clock.classify(pktCurrentTimeMs, localMs);
-    _clock.update(pktCurrentTimeMs, localMs);
+    TimeMs  localMs  = millis();
+    int32_t rawDelta = (int32_t)pktCurrentTimeMs - (int32_t)localMs;
+    float   before   = _clock.offset;
 
-    switch (action) {
+    switch (_clock.update(pktCurrentTimeMs, localMs)) {
         case ClockSync::Action::Warmup:
             Scarfnet::log("[SYNC] warmup %d/%d offset=%dms",
                           _clock.samples, kClockWarmupSamples, rawDelta);
@@ -180,7 +181,8 @@ void Mesh::updateClock(TimeMs pktCurrentTimeMs) {
                           before - (float)rawDelta);
             break;
         case ClockSync::Action::Track:
-            Scarfnet::log("[SYNC] offset=%.0fms raw=%dms", _clock.offset, rawDelta);
+            if (kVerboseLogging)
+                Scarfnet::log("[SYNC] offset=%.0fms raw=%dms", _clock.offset, rawDelta);
             break;
     }
 }

@@ -17,8 +17,24 @@
 ## Investigations
 
 - [ ] Investigate running on Zigbee/Thread (would require an upgraded ESP32)
-- [ ] What refactorings would make this more extensible and modular?
 - [ ] Figure out if there's a better way to form the network ad-hoc via button presses
+
+## Refactoring
+Reliability first:
+- [ ] Clock offset is a `float` (`clock_sync.h`): 1 ms resolution only up to ~4.7 h of network time, so after days of fleet uptime small corrections round away. Switch to int32 ms with an integer EMA, and add a test at offset ≈ 2.6e8. Same pass: the signed-overflow UB in `(int32_t)a - (int32_t)b` (use `(int32_t)(a - b)`)
+- [ ] Auto-OTA can reboot-loop: `_newerVersionSeen` is sticky, so a download that always fails (MD5, `Update.begin`) repeats forever. Add an RTC attempt counter / backoff. Also `kOtaHttpTimeoutMs` (30 s) < `kOtaServeTimeoutMs` (60 s), contradicting its comment
+
+Cleanup:
+- [ ] `rolloverGuard` is applied to `lastPressMs` (a time), and a changeIndex past 2^31 would make every peer adopt 0 and re-accept forever. Delete it or compare wrap-safely; fold `sync.h` into `sync_state.h`
+- [ ] README rewrite: still describes painlessMesh/JSON/`[SWARM]`, names `Scarf.h`, wrong default LED type, long-press row ignores tap tempo
+- [ ] Heap allocation in render paths: `Leds prevLeds` per frame during crossfade (`PatternManager.cpp`), palette vector rebuilt per pattern change (`palettes.cpp`); merge the parallel palette name/palette lists
+- [ ] Node-left log counts include the departing node (`NodeTracker::checkTimeouts` calls back before erase)
+- [ ] Sim Makefile: wildcard the pattern sources, and depend on headers
+- [ ] Consistency: pattern functions take `int32_t timeMs` (negative after 24.8 days), add `__attribute__((format(printf,1,2)))` to `log()`
+- [ ] Extract `Scarf::onReceived` / local-press decisions into a hardware-free, tested `SyncController` returning actions (apply, rebroadcast, alarm, send); share the node-flash table with the sim (`node_flash.h`, key it on local millis). Enables a native N-scarf lossy-network test
+- [ ] Drop the M5Stack library (only used for `Button`): smaller image, faster OTA. Needs a hardware button test
+- [ ] Extract the rx ring buffer into a testable `rx_queue.h`
+- [ ] Join bursts: every peer sends 3 heartbeats per join; consider having only one or two random peers respond
 
 # Actual testing up at Burning Man
 ## Bugs found

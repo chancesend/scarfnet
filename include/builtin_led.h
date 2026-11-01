@@ -10,8 +10,8 @@
 //                              blue normally, red if a peer runs newer firmware
 
 #include "config.h"
-#include "defines.h"     // CRGB
-#include "mesh_types.h"  // TimeMs
+#include "defines.h"
+#include "mesh_types.h"
 #include <stdint.h>
 
 namespace Scarfnet {

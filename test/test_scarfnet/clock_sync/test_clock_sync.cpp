@@ -75,7 +75,7 @@ void test_clock_sync_ema_converges_toward_peer()
 
     // Now peer drifts 1000ms ahead; EMA should move offset toward +1000
     cs.update(2000, 1000); // rawDelta = 1000; deviation = 1000 < 5000 → accepted
-    float expected = Scarfnet::kSwarmEmaAlpha * 1000.0f; // first EMA step from 0
+    float expected = kClockEmaAlpha * 1000.0f; // first EMA step from 0
     // Allow 1ms float rounding tolerance
     TEST_ASSERT_FLOAT_WITHIN(1.0f, expected, cs.offset);
 }
@@ -111,8 +111,8 @@ void test_clock_sync_far_behind_sample_ignored_after_warmup()
     }
     float before = cs.offset;
 
-    // Sample behind by more than kSwarmMaxClockDeviationMs — ignored
-    uint32_t behindPeerTime = 10000 - (uint32_t)kSwarmMaxClockDeviationMs - 1;
+    // Sample behind by more than kClockMaxDeviationMs — ignored
+    uint32_t behindPeerTime = 10000 - (uint32_t)kClockMaxDeviationMs - 1;
     cs.update(behindPeerTime, 0);
     TEST_ASSERT_FLOAT_WITHIN(0.1f, before, cs.offset);
     TEST_ASSERT_TRUE(cs.isWarmedUp());
@@ -125,7 +125,7 @@ void test_clock_sync_far_ahead_sample_jumps_to_it()
         cs.update(1000, 0);  // offset = 1000
     }
     // Sample ahead by more than the limit: hard-set to it, stay warmed up
-    uint32_t aheadPeerTime = 1000 + (uint32_t)kSwarmMaxClockDeviationMs + 1;
+    uint32_t aheadPeerTime = 1000 + (uint32_t)kClockMaxDeviationMs + 1;
     cs.update(aheadPeerTime, 0);
     TEST_ASSERT_FLOAT_WITHIN(0.1f, (float)aheadPeerTime, cs.offset);
     TEST_ASSERT_TRUE(cs.isWarmedUp());
@@ -171,15 +171,19 @@ void test_clock_sync_two_warmed_domains_merge_on_ahead_clock()
     TEST_ASSERT_TRUE(behind.isWarmedUp());
 }
 
-void test_clock_sync_classify_matches_update()
+void test_clock_sync_update_reports_action()
 {
-    ClockSync cs;
-    TEST_ASSERT_TRUE(cs.classify(1000, 0) == ClockSync::Action::Warmup);
-    for (int i = 0; i < kClockWarmupSamples; ++i) cs.update(10000, 0);
-    TEST_ASSERT_TRUE(cs.classify(10100, 0) == ClockSync::Action::Track);
-    TEST_ASSERT_TRUE(cs.classify(10000 + kSwarmMaxClockDeviationMs + 1, 0)
+    auto warmedUp = []() {
+        ClockSync cs;
+        for (int i = 0; i < kClockWarmupSamples; ++i) cs.update(10000, 0);
+        return cs;
+    };
+    ClockSync fresh;
+    TEST_ASSERT_TRUE(fresh.update(1000, 0) == ClockSync::Action::Warmup);
+    TEST_ASSERT_TRUE(warmedUp().update(10100, 0) == ClockSync::Action::Track);
+    TEST_ASSERT_TRUE(warmedUp().update(10000 + kClockMaxDeviationMs + 1, 0)
                      == ClockSync::Action::JumpAhead);
-    TEST_ASSERT_TRUE(cs.classify(10000 - kSwarmMaxClockDeviationMs - 1, 0)
+    TEST_ASSERT_TRUE(warmedUp().update(10000 - kClockMaxDeviationMs - 1, 0)
                      == ClockSync::Action::IgnoreBehind);
 }
 
@@ -189,15 +193,13 @@ void test_clock_sync_sample_at_exact_deviation_limit_accepted()
     for (int i = 0; i < kClockWarmupSamples; ++i) {
         cs.update(1000, 0); // offset = 1000
     }
-    // rawDelta = 1000 + kSwarmMaxClockDeviationMs — exactly at the limit
-    uint32_t peerTime = 1000 + (uint32_t)kSwarmMaxClockDeviationMs;
+    // rawDelta = 1000 + kClockMaxDeviationMs — exactly at the limit
+    uint32_t peerTime = 1000 + (uint32_t)kClockMaxDeviationMs;
     float before = cs.offset;
     cs.update(peerTime, 0);
-    // deviation == limit, fabsf check uses >, so this sample IS accepted
-    TEST_ASSERT_TRUE(cs.offset != before || before == cs.offset); // accepted → EMA moved
-    // Coarser check: offset moved toward the new rawDelta value
+    // deviation == limit is still in range, so the sample is tracked
     float rawDelta = (float)((int32_t)peerTime - (int32_t)0);
-    float newOffset = Scarfnet::kSwarmEmaAlpha * rawDelta + (1.0f - Scarfnet::kSwarmEmaAlpha) * before;
+    float newOffset = kClockEmaAlpha * rawDelta + (1.0f - kClockEmaAlpha) * before;
     TEST_ASSERT_FLOAT_WITHIN(1.0f, newOffset, cs.offset);
 }
 
@@ -333,7 +335,7 @@ void clock_sync_tests()
     RUN_TEST(test_clock_sync_far_ahead_sample_jumps_to_it);
     RUN_TEST(test_clock_sync_after_jump_behind_domain_cannot_drag_back);
     RUN_TEST(test_clock_sync_two_warmed_domains_merge_on_ahead_clock);
-    RUN_TEST(test_clock_sync_classify_matches_update);
+    RUN_TEST(test_clock_sync_update_reports_action);
     RUN_TEST(test_clock_sync_sample_at_exact_deviation_limit_accepted);
     RUN_TEST(test_clock_sync_handles_uint32_rollover);
     RUN_TEST(test_clock_sync_fresh_boot_converges_to_peer);

@@ -2,34 +2,29 @@
 
 #include "defines.h"
 
-#ifdef SCARFNET_EMBEDDED
+#if SCARFNET_EMBEDDED
 
 #include <esp_now.h>
 #include <freertos/portmacro.h>
 #include <functional>
 #include <cstdint>
 
-#include "config.h"           // kDefaultScarfNetId
-#include "mesh_types.h"       // NodeId, TimeMs, ScarfNetId
-#include "sync.h"             // ChangeIndex
-#include "clock_sync.h"       // ClockSync
-#include "heartbeat_packet.h" // HeartbeatPacket
-#include "heartbeat_framer.h" // HeartbeatFramer
-#include "node_tracker.h"     // NodeTracker
+#include "config.h"
+#include "mesh_types.h"
+#include "sync.h"
+#include "clock_sync.h"
+#include "heartbeat_packet.h"
+#include "heartbeat_framer.h"
+#include "node_tracker.h"
 #include "log.h"
 
 namespace Scarfnet {
 
 // ── Mesh class ───────────────────────────────────────────────────────────────
 
-// Connectionless mesh over ESP-NOW broadcast. Each node broadcasts heartbeats
-// to FF:FF:FF:FF:FF:FF every kHeartbeatIntervalMs. Join/leave events are
-// synthesised from the heartbeat stream via timeout tracking.
-//
-// Transport concerns are delegated to standalone units:
-//   NodeTracker     — peer map, join/leave synthesis  (include/node_tracker.h)
-//   ClockSync       — EMA clock offset                (include/clock_sync.h)
-//   HeartbeatFramer — packet encode/decode            (include/heartbeat_framer.h)
+// Connectionless mesh over ESP-NOW broadcast. Join/leave events are synthesised
+// from the heartbeat stream by timeout. Peer tracking, clock sync and framing
+// live in the hardware-free NodeTracker, ClockSync and HeartbeatFramer.
 class Mesh {
 public:
     // Re-exported so Mesh::TimeMs / Mesh::NodeId / Mesh::ChangeIndex remain
@@ -52,14 +47,12 @@ public:
     // Node ID derived from the last 4 bytes of this device's MAC address.
     NodeId nodeId()    const { return _nodeId; }
 
-    // Synchronized millisecond clock: millis() + EMA-smoothed peer-offset.
-    // Converges across the fleet as heartbeats exchange currentTimeMs values.
+    // Network clock, converged across the fleet from heartbeat timestamps.
     TimeMs timeMs()    const;
 
     // Number of peer nodes currently tracked (excludes self).
     size_t nodeCount() const { return _tracker.count(); }
 
-    // Broadcast a heartbeat packet to all ESP-NOW peers on kEspNowChannel.
     void broadcast(const HeartbeatPacket& pkt);
 
     // Register callbacks. Each fires on the loop() task (not the WiFi task).
@@ -67,8 +60,7 @@ public:
     void onNodeJoined(NodeCb cb)     { _joinedCb   = std::move(cb); }
     void onNodeLeft(NodeCb cb)       { _leftCb     = std::move(cb); }
 
-    // Override the logical network ID (default: kDefaultScarfNetId from config.h).
-    // Call at startup after loading from Preferences to join a specific ScarfNet.
+    // Join a ScarfNet other than kDefaultScarfNetId.
     void setScarfNetId(ScarfNetId id) { _scarfNetId = id; }
 
 private:
@@ -76,25 +68,25 @@ private:
     static void espNowRecvCb(const uint8_t* mac, const uint8_t* data, int len);
     // Processes one received packet on the loop task.
     void handleReceived(const uint8_t* mac, const uint8_t* data, int len);
-    // Update EMA clock offset from a peer's reported time, with logging.
+    // Feed a peer's timestamp to the clock estimate, with logging.
     void updateClock(TimeMs pktCurrentTimeMs);
 
     static NodeId macToNodeId(const uint8_t* mac);
 
     NodeId      _nodeId     = 0;
     ScarfNetId  _scarfNetId = kDefaultScarfNetId;
-    ClockSync   _clock;    // EMA clock offset
-    NodeTracker _tracker;  // peer map + join/leave synthesis
+    ClockSync   _clock;
+    NodeTracker _tracker;
 
     ReceivedCb _receivedCb;
     NodeCb     _joinedCb;
     NodeCb     _leftCb;
 
     // Ring buffer: espNowRecvCb (WiFi task) writes; update() (loop task) reads.
-    static constexpr int kRxQueueSize = 8;
+    static constexpr int kRxQueueSize = 16;
     struct RxEntry {
         uint8_t mac[6];
-        uint8_t data[250];
+        uint8_t data[HeartbeatFramer::kMaxWireLen];
         int     len;
     };
     portMUX_TYPE _rxMux;

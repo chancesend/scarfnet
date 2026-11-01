@@ -19,8 +19,8 @@ namespace Scarfnet
 //     for a server AP and downloads firmware if a newer version is found.
 //     Also entered automatically after a normal-mode scarf finds a newer
 //     server (see autoUpdateTick); then it gives up after kOtaAutoTimeoutMs.
-//   Server (purple blink): entered by holding the button 5 s (kOtaHoldMs) while in receiver
-//     mode. Starts a WiFi AP (on kEspNowChannel) and HTTP server that serves the
+//   Server (purple blink): entered by holding the button kOtaHoldMs while in receiver
+//     mode. Starts a WiFi AP on the ESP-NOW channel and an HTTP server that serves the
 //     running firmware binary to receiver scarves.
 class OtaManager
 {
@@ -32,8 +32,8 @@ public:
     OtaManager(int buttonPin, LedSetter ledSetter);
     ~OtaManager(); // defined in .cpp where WebServer is complete
 
-    // Called once at boot (before mesh init). Returns true if OTA mode was
-    // triggered (button held kOtaHoldMs); false if button was released early.
+    // Called once at boot, before mesh init. Returns true if OTA mode was
+    // triggered by the button hold or a pending auto-update.
     bool checkBootTrigger();
 
     // Must be called every loop iteration while in OTA mode (normal mesh loop is skipped).
@@ -45,23 +45,21 @@ public:
     // receiver mode to update (giving up after kOtaAutoTimeoutMs).
     void autoUpdateTick(bool newerPeerSeen);
 
-    // Returns true after checkBootTrigger() confirmed OTA mode.
     bool isActive() const { return _active; }
-    // Returns the current OTA sub-mode (receiver or server).
-    Mode getMode()  const { return _mode; }
 
 private:
     // --- LED helpers ---
-    void strobe(CRGB color, int count, int onMs, int offMs);
+    void strobe(CRGB color, int count, uint32_t halfPeriodMs);
 
     // --- Server ---
     void enterServerMode();
-    bool computeFirmwareInfo(); // populates _firmwareSize and _firmwareMd5
+    bool computeFirmwareInfo();
     void handleInfoRequest();
     void handleFirmwareRequest();
     void serverLoop();
 
     // --- Receiver ---
+    bool fail();  // LED off, disconnect, return false
     void receiverLoop();
     bool attemptDownload(const String& serverSsid);
     bool connectToServer(const String& ssid);

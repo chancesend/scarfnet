@@ -1,75 +1,56 @@
 #pragma once
 
-// Pure clock-sync logic, extracted from Mesh::updateClock / Mesh::timeMs so it
-// can be unit-tested on the native platform without any Arduino or ESP-NOW deps.
+// Network clock estimate from peers' heartbeat timestamps. Hardware-free so it
+// is natively testable.
 //
-// Usage:
-//   ClockSync cs;
-//   cs.update(pktCurrentTimeMs, millis());  // call on each received heartbeat
-//   uint32_t now = cs.timeMs(millis());     // synced clock for rendering
-//
-// Two offsets: `offset` is the target — the best estimate of the network
-// clock, updated by the rules in update(). timeMs() returns a displayed offset
-// that slews toward the target at up to kClockSlewRate, so small corrections
-// (≤ kSwarmMaxClockDeviationMs) play out as a brief speed-up or slow-down of
-// the animation rather than a visible skip, and the synced clock never runs
-// backward. Hard-sets (warmup, jump to an ahead domain) take effect at once.
+// `offset` is the target: the best estimate of network time minus millis().
+// timeMs() applies a displayed offset that slews toward the target at up to
+// kClockSlewRate, so small corrections play out as a brief speed-up or
+// slow-down of the animation rather than a visible skip, and the synced clock
+// never runs backward. Hard-sets (warmup, jump to an ahead domain) take effect
+// at once.
 
 #include <stdint.h>
-#include <cmath>
 
-#include "config.h"     // kClockWarmupSamples, kSwarmMaxClockDeviationMs, kClockSlewRate
-#include "mesh_types.h" // TimeMs
-#include "swarm_ema.h"  // kSwarmEmaAlpha
+#include "config.h"
+#include "mesh_types.h"
 
 namespace Scarfnet {
 
 struct ClockSync {
     float offset  = 0.0f;  // target: millis() + (int32_t)offset == network time
-    int   samples = 0;     // number of heartbeats processed so far
+    int   samples = 0;     // heartbeats processed so far
 
-    // Feed one received peer timestamp. localMs should be millis() at the
-    // moment the packet was processed (not when it was received by the ISR).
-    void update(TimeMs peerTimeMs, TimeMs localMs) {
+    enum class Action { Warmup, Track, JumpAhead, IgnoreBehind };
+
+    // Feed one received peer timestamp. localMs is millis() when the packet
+    // is processed. Returns what was done with the sample.
+    Action update(TimeMs peerTimeMs, TimeMs localMs) {
         int32_t rawDelta = (int32_t)peerTimeMs - (int32_t)localMs;
 
         if (samples < kClockWarmupSamples) {
-            // Hard-set during warmup: a freshly-booted node has millis()≈0
-            // while established peers are at hours-long timestamps. The EMA
-            // window is too narrow to converge from that distance; hard-set
-            // instead so the first few heartbeats snap the offset immediately.
             hardSet((float)rawDelta, localMs);
             ++samples;
-            return;
+            return Action::Warmup;
         }
 
-        // After warmup, a sample far from our estimate means the sender is in
-        // a different clock domain — e.g. a group of scarves that rebooted
-        // together and warmed up on each other. The domain that is AHEAD wins:
-        // if the sender is far ahead, hard-set to its clock; if it's far
-        // behind, ignore it (it will jump to ours). Every group converges on
-        // the furthest-ahead clock with no voting. We stay warmed up after a
+        // A sample far from our estimate is from a different clock domain —
+        // e.g. a group of scarves that rebooted together and warmed up on each
+        // other. The domain that is AHEAD wins: jump to a far-ahead sender,
+        // ignore a far-behind one (it will jump to ours). Every group converges
+        // on the furthest-ahead clock with no voting. We stay warmed up after a
         // jump so a behind-domain peer heard next can't drag us back. Packets
         // are CRC-checked, so a corrupt far-future timestamp is not a concern.
         float diff = (float)rawDelta - offset;
-        if (diff > (float)kSwarmMaxClockDeviationMs) {
+        if (diff > (float)kClockMaxDeviationMs) {
             hardSet((float)rawDelta, localMs);
-            return;
+            return Action::JumpAhead;
         }
-        if (diff < -(float)kSwarmMaxClockDeviationMs) return;
+        if (diff < -(float)kClockMaxDeviationMs)
+            return Action::IgnoreBehind;
 
-        // Small correction: move the target; the displayed clock slews to it.
         rebaseSlew(localMs);
-        offset = kSwarmEmaAlpha * (float)rawDelta + (1.0f - kSwarmEmaAlpha) * offset;
-    }
-
-    // What update() would do with this sample, for logging.
-    enum class Action { Warmup, Track, JumpAhead, IgnoreBehind };
-    Action classify(TimeMs peerTimeMs, TimeMs localMs) const {
-        if (samples < kClockWarmupSamples) return Action::Warmup;
-        float diff = (float)((int32_t)peerTimeMs - (int32_t)localMs) - offset;
-        if (diff >  (float)kSwarmMaxClockDeviationMs) return Action::JumpAhead;
-        if (diff < -(float)kSwarmMaxClockDeviationMs) return Action::IgnoreBehind;
+        offset = kClockEmaAlpha * (float)rawDelta + (1.0f - kClockEmaAlpha) * offset;
         return Action::Track;
     }
 
@@ -83,7 +64,6 @@ struct ClockSync {
         return offset;
     }
 
-    // Synchronized time given the current local millis() value.
     TimeMs timeMs(TimeMs localMs) const {
         return (TimeMs)((int32_t)localMs + (int32_t)displayedOffset(localMs));
     }

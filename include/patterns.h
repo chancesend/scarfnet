@@ -1,8 +1,8 @@
 #pragma once
 
 #include "defines.h"
-#include "mesh_types.h"  // NodeId, TimeMs
-#include "tap_tempo.h"   // BeatInfo
+#include "mesh_types.h"
+#include "tap_tempo.h"
 
 #include <stdint.h>
 #include <string>

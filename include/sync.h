@@ -9,9 +9,6 @@ namespace Scarfnet
 // Typed explicitly so call sites are clear about what they're comparing.
 using ChangeIndex = uint32_t;
 
-// Pure sync-acceptance logic, extracted from Scarf::onReceivedData so it can
-// be unit-tested on the native platform without any Arduino/mesh dependencies.
-
 // Returns true if an incoming changeIndex should replace the local one.
 // Rejects equal or older indexes to prevent oscillation and duplicate echoes.
 inline bool shouldAcceptUpdate(ChangeIndex incoming, ChangeIndex local)

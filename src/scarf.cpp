@@ -45,22 +45,16 @@ void Scarf::sendMessage()
     // Jitter the next interval so nodes on identical boot schedules drift apart.
     int32_t jitter = (int32_t)random(kHeartbeatJitterMs * 2 + 1) - (int32_t)kHeartbeatJitterMs;
     _taskSendMessage.setInterval(kHeartbeatIntervalMs + jitter);
-    Scarfnet::log("[SND] id=%u pattern=%s ci=%u time=%u rnd=%u ti=%u beat=%u/%u ver=%u",
-                  pkt.id, pkt.pattern, pkt.changeIndex, pkt.currentTimeMs,
-                  pkt.globalRandomizer, pkt.tempoIndex, pkt.beatIntervalMs, pkt.beatPhaseMs,
-                  pkt.version);
+    if (kVerboseLogging)
+        Scarfnet::log("[SND] id=%u pattern=%s ci=%u time=%u rnd=%u ti=%u beat=%u/%u ver=%u",
+                      pkt.id, pkt.pattern, pkt.changeIndex, pkt.currentTimeMs,
+                      pkt.globalRandomizer, pkt.tempoIndex, pkt.beatIntervalMs, pkt.beatPhaseMs,
+                      pkt.version);
 }
 
 void Scarf::onNodeJoined(Mesh::NodeId nodeId)
 {
     Scarfnet::log("[SCARF] node %u joined (%u peers)", nodeId, (unsigned)_mesh->nodeCount());
-    _blinkNoNodes.setIterations((int)_mesh->nodeCount() * 2);
-    TimeMs msToNextSync = kNodeBlinkPeriodMs - (_mesh->timeMs() % kNodeBlinkPeriodMs);
-    _blinkNoNodes.enableDelayed(msToNextSync);
-
-    // Burst sync so the joining node converges pattern and clock quickly.
-    // Every peer hears the join at the same moment; jitter the start so their
-    // bursts don't collide on air. See kBurstSyncJitterMs.
     _taskBurstSync.setIterations(kBurstSyncCount);
     _taskBurstSync.enableDelayed(kBurstSyncIntervalMs + (unsigned long)random(kBurstSyncJitterMs + 1));
 }
@@ -68,7 +62,6 @@ void Scarf::onNodeJoined(Mesh::NodeId nodeId)
 void Scarf::onNodeLeft(Mesh::NodeId nodeId)
 {
     Scarfnet::log("[SCARF] node %u left (%u peers)", nodeId, (unsigned)_mesh->nodeCount());
-    _blinkNoNodes.setIterations((int)_mesh->nodeCount() * 2);
 }
 
 void Scarf::debugModeUpdate(const HeartbeatPacket& pkt) {
@@ -95,6 +88,12 @@ void Scarf::debugModeUpdate(const HeartbeatPacket& pkt) {
     }
 }
 
+// Push a freshly accepted state onward without waiting for the next heartbeat.
+void Scarf::scheduleRebroadcast()
+{
+    _taskRebroadcast.restartDelayed((unsigned long)random(kRebroadcastJitterMs + 1));
+}
+
 void Scarf::onReceived(const HeartbeatPacket& pkt)
 {
     if (pkt.version > kScarfVersion)
@@ -109,12 +108,12 @@ void Scarf::onReceived(const HeartbeatPacket& pkt)
         case TempoSync::Result::TakenOver:
             Scarfnet::log("[SCARF][TEMPO] node %u took over tap-tempo (ti=%u interval=%u) — leaving tap mode",
                           pkt.id, pkt.tempoIndex, pkt.beatIntervalMs);
-            _taskRebroadcast.restartDelayed((unsigned long)random(kRebroadcastJitterMs + 1));
+            scheduleRebroadcast();
             break;
         case TempoSync::Result::Adopted:
             Scarfnet::log("[SCARF][TEMPO] adopting ti=%u interval=%u from node %u",
                           pkt.tempoIndex, pkt.beatIntervalMs, pkt.id);
-            _taskRebroadcast.restartDelayed((unsigned long)random(kRebroadcastJitterMs + 1));
+            scheduleRebroadcast();
             break;
     }
 
@@ -151,11 +150,7 @@ void Scarf::onReceived(const HeartbeatPacket& pkt)
     // rather than our own stale one. See sync_state.h.
     adoptSyncState(_sync, pkt);
 
-    // Epidemic re-broadcast: we just accepted a new state, so push it onward
-    // immediately (after a little jitter) rather than waiting for the next
-    // scheduled heartbeat. Nodes that already have it will reject the duplicate,
-    // so each node re-emits at most once per update. See kRebroadcastJitterMs.
-    _taskRebroadcast.restartDelayed((unsigned long)random(kRebroadcastJitterMs + 1));
+    scheduleRebroadcast();
 }
 
 void Scarf::setup()
@@ -209,7 +204,7 @@ void Scarf::setup()
             break;
     }
 
-    FastLED.setMaxPowerInMilliWatts(500);
+    FastLED.setMaxPowerInMilliWatts(kLedStripPowerLimitMw);
 
     _userScheduler.addTask(_taskSendMessage);
     _taskSendMessage.enable();
@@ -220,12 +215,22 @@ void Scarf::setup()
     _userScheduler.addTask(_taskBurstSync);
     _userScheduler.addTask(_taskRebroadcast);
 
-    _blinkNoNodes.set(kNodeBlinkPeriodMs, 0,
-                      [this]() { blinkNumNodes(); });
-    _userScheduler.addTask(_blinkNoNodes);
-
-    randomSeed(micros());
+    // FastLED's generator starts identically on every board; seed it now that
+    // the radio is on and esp_random() draws real entropy.
+    random16_set_seed((uint16_t)esp_random());
     Scarfnet::log("Scarf::setup() done");
+}
+
+// A local press that changes the look: claim the next change index with a
+// fresh randomizer. Returns the randomizer to apply.
+Rnd Scarf::recordLocalPress()
+{
+    _sync.lastPressMs = _mesh->timeMs();
+    _sync.lastPressId = _mesh->nodeId();
+    _sync.randomizer  = (Rnd)esp_random();
+    _sync.changeIndex += 1;
+    Scarfnet::log("[SCARF] local press → randomizer=%u ci=%u", _sync.randomizer, _sync.changeIndex);
+    return _sync.randomizer;
 }
 
 void Scarf::processEvent(const ObservableButton::Event& event)
@@ -245,14 +250,7 @@ void Scarf::processEvent(const ObservableButton::Event& event)
         case ObservableButton::Event::ePress:
         {
             if (!_tempo.tapMode) {
-                _sync.lastPressMs = _mesh->timeMs();
-                _sync.lastPressId = _mesh->nodeId();
-                _sync.randomizer  = (Rnd)random();
-                _patternManager->incrementPattern(_sync.randomizer);
-                _sync.changeIndex += 1;
-                Scarfnet::log("ePress → pattern=%s randomizer=%u ci=%u",
-                    _patternManager->getCurrentPattern().c_str(),
-                    _sync.randomizer, _sync.changeIndex);
+                _patternManager->incrementPattern(recordLocalPress());
                 _taskSendMessage.forceNextIteration();
             }
             break;
@@ -265,15 +263,7 @@ void Scarf::processEvent(const ObservableButton::Event& event)
                 Scarfnet::log("eLongPress → tap-tempo %s ti=%u",
                     _tempo.tapMode ? "ON" : "OFF", _tempo.index);
             } else {
-                // Original behaviour: same pattern, new randomizer.
-                _sync.lastPressMs = _mesh->timeMs();
-                _sync.lastPressId = _mesh->nodeId();
-                _sync.randomizer  = (Rnd)random();
-                _patternManager->samePatternDifferentRandomizer(_sync.randomizer);
-                _sync.changeIndex += 1;
-                Scarfnet::log("eLongPress → pattern=%s randomizer=%u ci=%u",
-                    _patternManager->getCurrentPattern().c_str(),
-                    _sync.randomizer, _sync.changeIndex);
+                _patternManager->samePatternDifferentRandomizer(recordLocalPress());
             }
             _taskSendMessage.forceNextIteration();
             break;
@@ -284,7 +274,7 @@ void Scarf::processEvent(const ObservableButton::Event& event)
             ledType = (ledType + 1) % kLedType_Count;
             _preferences.putInt(kLedTypeString, ledType);
             Scarfnet::log("eExtraLongPress — LED type → %i, restarting", ledType);
-            delay(1000);
+            delay(kLedTypeRestartDelayMs);
             ESP.restart();
             break;
         }
@@ -303,10 +293,9 @@ void Scarf::loop()
         showLEDs();
         showBuiltInLED();
         FastLED.show();
-        // FastLED.show() applies global power scaling to all controllers, which
-        // dims the built-in LED along with the external strip. Re-show the built-in
-        // LED immediately at full brightness so it's excluded from current limiting.
-        _builtinLedController->showLeds(128);
+        // FastLED.show() power-scales every controller, built-in LED included;
+        // re-show the built-in LED so it is exempt from the strip's power limit.
+        _builtinLedController->showLeds(kBuiltinLedBrightness);
     }
     EVERY_N_MILLISECONDS(kPaletteBlendRateMs)
     {
@@ -350,21 +339,6 @@ void Scarf::showLEDs()
         _mesh->timeMs(), 
         _tempo.tempo.beatInfo(_timeMsec),
         nodeInfo);
-}
-
-void Scarf::blinkNumNodes()
-{
-    constexpr int kBlinkDurationMs = 100;
-    _onFlag = !_onFlag;
-    _blinkNoNodes.delay(kBlinkDurationMs);
-
-    if (_blinkNoNodes.isLastIteration())
-    {
-        _blinkNoNodes.setIterations((int)_mesh->nodeCount() * 2);
-        TimeMs msToNextBlinkSync = kNodeBlinkPeriodMs -
-            (_mesh->timeMs() % kNodeBlinkPeriodMs);
-        _blinkNoNodes.enableDelayed(msToNextBlinkSync);
-    }
 }
 
 void Scarf::otaLoop()

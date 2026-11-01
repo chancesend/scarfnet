@@ -97,17 +97,16 @@ Everything fits inside the zippered pocket: M5 controller, USB battery, USB-A to
 
 ## Getting Started - software
 
-Create `include/login.h` (gitignored) with your mesh credentials:
+Create `include/login.h` (gitignored) with your OTA credentials:
 
 ```cpp
 #pragma once
-const char* kMeshSSID     = "your-mesh-ssid";
-const char* kMeshPassword = "your-mesh-password";
-const uint16_t kMeshPort  = 5555;
+#include <string>
+const std::string kMeshPassword = "your-ota-password";
 constexpr const char* kOtaHttpUser = "your-ota-http-user";
 ```
 
-The main Scarfnet network has a unique SSID, password, and username. If you want to be a part of this main network, you should ask the Scarfnet creator or just have them flash your unit.
+The main Scarfnet network has a unique password and username. If you want to be a part of this main network, you should ask the Scarfnet creator or just have them flash your unit.
 
 ## Build & Flash
 
@@ -145,11 +144,11 @@ The firmware uses an **observer pattern** throughout. The top-level coordinator 
 
 ### Mesh (`include/Mesh.h`, `src/Mesh.cpp`)
 
-Wraps `painlessMesh` WiFi mesh. Exposes observer hooks for connection changes (`addConnectionObserver`) and incoming JSON messages (`addReceivedDataObserver`). Handles time synchronization with rollover protection, periodic delay calculations, and EMA-smoothed per-node arrival delta tracking for swarm pattern work.
+Connectionless mesh over ESP-NOW broadcast. Sends and receives heartbeat packets, synthesises node join/leave events by timeout, and keeps the fleet-wide network clock (`ClockSync`).
 
 ### ObservableButton (`include/ObservableButton.h`, `src/ObservableButton.cpp`)
 
-Polls a hardware button on a `TaskScheduler` task, classifies presses into `ePress`, `eLongPress`, `eExtraLongPress`, and `eDoublePress` events, and broadcasts to registered observers.
+Polls a hardware button on a `TaskScheduler` task, classifies presses into `eDown`, `ePress`, `eLongPress`, and `eExtraLongPress` events, and broadcasts to registered observers.
 
 ### PatternManager (`include/PatternManager.h`)
 
@@ -201,7 +200,7 @@ The type is toggled via extra-long press and survives reboots.
 
 | File | Purpose |
 |---|---|
-| `include/login.h` | **Gitignored.** Mesh SSID, password, and port. Must be created locally. |
+| `include/login.h` | **Gitignored.** OTA password and HTTP user. Must be created locally. |
 | `include/config.h` | All timing constants, `kScarfVersion` (increment before OTA flashing), and `kOtaHttpUser`. Single source of truth — never hard-code timing values elsewhere. |
 | `include/defines.h` | Pin assignments, LED count, LED type enums, `SCARFNET_EMBEDDED` compile guard. |
 | `include/typedefs.h` | Core type aliases: `Leds` (`std::vector<CRGB>`) and `Rnd` (`uint16_t`). |
@@ -241,14 +240,6 @@ The sim compiles the real pattern engine (`src/patterns/`, `PatternManager`, `pa
 
 ## Python Tooling
 
-Scripts live in `tools/`. Use `uv` — never bare `python3`.
+Scripts live in `tools/`. Use `uv` — never bare `python3`. `tools/pio_guard_nvs.py` is a PlatformIO extra script and runs inside PlatformIO's own Python.
 
-```bash
-# Run a tool script
-uv run tools/scarfnet-log-viz.py logs/session.txt -o traces.json
-
-# Scripts are also directly executable via their uv shebang
-./tools/scarfnet-log-viz.py logs/session.txt -o traces.json
-```
-
-All scripts use [PEP 723 inline script metadata](https://peps.python.org/pep-0723/) to declare their Python version and dependencies.
+Standalone scripts use [PEP 723 inline script metadata](https://peps.python.org/pep-0723/) to declare their Python version and dependencies.

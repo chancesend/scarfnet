@@ -8,7 +8,7 @@ namespace Scarfnet
 #if SCARFNET_EMBEDDED
 ObservableButton::ObservableButton(Scheduler* scheduler, uint8_t buttonPin)
     : _scheduler(scheduler),
-      _button(buttonPin, 1, 10),
+      _button(buttonPin, 1, kButtonDebounceMs),
       _pollFn([this]() -> ButtonReading {
           // read() MUST be called first to latch the current pin state.
           // It is baked into this lambda so it cannot be accidentally omitted.

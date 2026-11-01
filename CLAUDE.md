@@ -22,7 +22,7 @@ Tests live in `test/test_scarfnet/`. `test_main.cpp` is the entry point.
 
 ### Native test constraints
 
-`Mesh.h` pulls in `painlessMesh.h → Arduino.h` and cannot compile natively. Logic that needs unit testing must be extracted into a standalone header with no hardware deps (see `include/mesh_time.h`, `include/sync.h`, `include/swarm_ema.h` as examples). Test files include these directly. `src/` files are not compiled in native test mode.
+`Mesh.h` pulls in ESP-NOW and Arduino headers and cannot compile natively. Logic that needs unit testing must be extracted into a standalone header with no hardware deps (see `include/clock_sync.h`, `include/sync_state.h`, `include/tempo_sync.h` as examples). Test files include these directly. `src/` files are not compiled in native test mode.
 
 ## Pattern Simulator
 

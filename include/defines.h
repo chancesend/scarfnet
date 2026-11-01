@@ -1,9 +1,6 @@
 #pragma once
 
-#define USE_GET_MILLISECOND_TIMER (true)
-
 #if SCARFNET_EMBEDDED
-//#define FASTLED_INTERNAL (1)
 #include <FastLED.h>
 #else
 #include "fastled_stub.h"
@@ -15,8 +12,8 @@
 const int kNumLeds = 25;
 
 #if SCARFNET_EMBEDDED
-const int kLedPin  = 26; // This pin is ignored when using FASTLED_ESP8266_DMA
-const int kBuiltinLedPin = 27; // GPIO number of builtin LED
+const int kLedPin  = 26;
+const int kBuiltinLedPin = 27;
 const int kNumBuiltinLeds = 1;
 const int kButtonPin = 39;
 

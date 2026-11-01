@@ -30,6 +30,10 @@ static const uint16_t    kOtaHttpPort   = 80;
 static const uint32_t kAutoOtaMagic = 0x4155544Fu;  // "AUTO"
 RTC_NOINIT_ATTR static uint32_t gAutoOtaRequest;
 
+// Shared by firmware hashing, serving and downloading, which never overlap.
+// Static: too big for the loop stack.
+static uint8_t sChunkBuf[kOtaFlashChunkBytes];
+
 // ─── Construction ────────────────────────────────────────────────────────────
 
 OtaManager::OtaManager(int buttonPin, LedSetter ledSetter)
@@ -41,15 +45,22 @@ OtaManager::~OtaManager() = default;
 
 // ─── LED helper ──────────────────────────────────────────────────────────────
 
-void OtaManager::strobe(CRGB color, int count, int onMs, int offMs)
+void OtaManager::strobe(CRGB color, int count, uint32_t halfPeriodMs)
 {
     for (int i = 0; i < count; i++)
     {
         _ledSetter(color);
-        delay(onMs);
+        delay(halfPeriodMs);
         _ledSetter(CRGB::Black);
-        delay(offMs);
+        delay(halfPeriodMs);
     }
+}
+
+bool OtaManager::fail()
+{
+    _ledSetter(CRGB::Black);
+    WiFi.disconnect();
+    return false;
 }
 
 // ─── Boot trigger ─────────────────────────────────────────────────────────────
@@ -72,9 +83,9 @@ bool OtaManager::checkBootTrigger()
     if (digitalRead(_buttonPin) != LOW)
         return false;
 
-    Scarfnet::log("[OTA] Button held at boot — waiting %ds for OTA trigger...", kOtaHoldMs / 1000);
+    Scarfnet::log("[OTA] Button held at boot — waiting %us for OTA trigger...", (unsigned)(kOtaHoldMs / 1000));
 
-    for (int elapsed = 0; elapsed < kOtaHoldMs; elapsed += kOtaBootBlinkHalfPeriodMs)
+    for (uint32_t elapsed = 0; elapsed < kOtaHoldMs; elapsed += kOtaBootBlinkHalfPeriodMs)
     {
         bool on = (elapsed / kOtaBootBlinkHalfPeriodMs) % 2 == 0;
         _ledSetter(on ? kReceiverColor : CRGB::Black);
@@ -133,7 +144,7 @@ void OtaManager::loop()
         {
             if (_buttonHoldStartMs == 0)
                 _buttonHoldStartMs = now;
-            else if (now - _buttonHoldStartMs >= (uint32_t)kOtaHoldMs)
+            else if (now - _buttonHoldStartMs >= kOtaHoldMs)
             {
                 enterServerMode();
                 _buttonHoldStartMs = 0;
@@ -168,14 +179,17 @@ bool OtaManager::computeFirmwareInfo()
     MD5Builder md5;
     md5.begin();
 
-    static uint8_t buf[kOtaFlashChunkBytes];  // static: too big for the loop stack
     size_t remaining = _firmwareSize;
     size_t offset    = 0;
     while (remaining > 0)
     {
         size_t chunk = (remaining < kOtaFlashChunkBytes) ? remaining : kOtaFlashChunkBytes;
-        esp_partition_read(partition, offset, buf, chunk);
-        md5.add(buf, chunk);
+        if (esp_partition_read(partition, offset, sChunkBuf, chunk) != ESP_OK)
+        {
+            Scarfnet::log("[OTA] esp_partition_read() failed at %u", offset);
+            return false;
+        }
+        md5.add(sChunkBuf, chunk);
         offset    += chunk;
         remaining -= chunk;
     }
@@ -264,7 +278,6 @@ void OtaManager::handleFirmwareRequest()
     // connected while every write blocks and fails. Stop on the first short
     // write, and cap the whole transfer, so one bad client can't hang the
     // server for everyone else.
-    static uint8_t buf[kOtaFlashChunkBytes];  // static: too big for the loop stack
     size_t   remaining = _firmwareSize;
     size_t   offset    = 0;
     uint32_t start     = millis();
@@ -275,8 +288,9 @@ void OtaManager::handleFirmwareRequest()
         if (millis() - start >= kOtaServeTimeoutMs)   { why = "aborted (transfer timeout)";        break; }
 
         size_t chunk = (remaining < kOtaFlashChunkBytes) ? remaining : kOtaFlashChunkBytes;
-        esp_partition_read(partition, offset, buf, chunk);
-        if (client.write(buf, chunk) != chunk)        { why = "aborted (write failed)";            break; }
+        if (esp_partition_read(partition, offset, sChunkBuf, chunk) != ESP_OK)
+                                                      { why = "aborted (flash read failed)";       break; }
+        if (client.write(sChunkBuf, chunk) != chunk)  { why = "aborted (write failed)";            break; }
         offset    += chunk;
         remaining -= chunk;
     }
@@ -337,7 +351,7 @@ void OtaManager::receiverLoop()
 
 bool OtaManager::attemptDownload(const String& serverSsid)
 {
-    strobe(CRGB::White, 3, 80, 80); // server detected
+    strobe(CRGB::White, kOtaServerFoundStrobeCount, kOtaServerFoundStrobeHalfPeriodMs);
 
     if (!connectToServer(serverSsid))
         return false;
@@ -348,7 +362,7 @@ bool OtaManager::attemptDownload(const String& serverSsid)
     if (!fetchFirmwareInfo(base, version, size, md5))
         return false;
 
-    strobe(CRGB::White, 4, 60, 60); // connected + info verified
+    strobe(CRGB::White, kOtaInfoVerifiedStrobeCount, kOtaInfoVerifiedStrobeHalfPeriodMs);
 
     return downloadAndFlash(base, size, md5, version);
 }
@@ -367,9 +381,7 @@ bool OtaManager::connectToServer(const String& ssid)
         if (millis() - start > kOtaConnectTimeoutMs)
         {
             Scarfnet::log("[OTA] Connect timeout");
-            _ledSetter(CRGB::Black);
-            WiFi.disconnect();
-            return false;
+            return fail();
         }
         if (millis() - ledToggle >= kOtaConnectLedHalfPeriodMs)
         {
@@ -377,7 +389,7 @@ bool OtaManager::connectToServer(const String& ssid)
             ledToggle = millis();
             _ledSetter(ledOn ? CRGB::White : CRGB::Black);
         }
-        delay(10);
+        delay(kOtaConnectPollMs);
     }
     Scarfnet::log("[OTA] Connected. IP: %s", WiFi.localIP().toString().c_str());
     return true;
@@ -394,9 +406,7 @@ bool OtaManager::fetchFirmwareInfo(const String& base, int& serverVersion, size_
     {
         Scarfnet::log("[OTA] /info failed: HTTP %d", code);
         http.end();
-        _ledSetter(CRGB::Black);
-        WiFi.disconnect();
-        return false;
+        return fail();
     }
 
     JsonDocument doc;
@@ -405,9 +415,7 @@ bool OtaManager::fetchFirmwareInfo(const String& base, int& serverVersion, size_
     if (err)
     {
         Scarfnet::log("[OTA] /info JSON parse error: %s", err.c_str());
-        _ledSetter(CRGB::Black);
-        WiFi.disconnect();
-        return false;
+        return fail();
     }
 
     serverVersion = doc["version"];
@@ -419,9 +427,7 @@ bool OtaManager::fetchFirmwareInfo(const String& base, int& serverVersion, size_
     {
         Scarfnet::log("[OTA] /info reports v%d — not newer than own v%d, aborting",
             serverVersion, kScarfVersion);
-        _ledSetter(CRGB::Black);
-        WiFi.disconnect();
-        return false;
+        return fail();
     }
 
     Scarfnet::log("[OTA] Server v%d  size=%u  MD5=%s",
@@ -440,27 +446,21 @@ bool OtaManager::downloadAndFlash(const String& base, size_t firmwareSize, const
     {
         Scarfnet::log("[OTA] /firmware failed: HTTP %d", code);
         http.end();
-        _ledSetter(CRGB::Black);
-        WiFi.disconnect();
-        return false;
+        return fail();
     }
 
     if (!Update.begin(firmwareSize))
     {
         Scarfnet::log("[OTA] Update.begin failed: %s", Update.errorString());
         http.end();
-        _ledSetter(CRGB::Black);
-        WiFi.disconnect();
-        return false;
+        return fail();
     }
     Update.setMD5(firmwareMd5.c_str());
 
-    // Manual chunk loop so we can update the LED as download progresses.
-    // Pulse half-period interpolates from 1000 ms (0%) → 50 ms (100%).
+    // Manual chunk loop so the LED pulse can speed up with progress.
     WiFiClient* stream = http.getStreamPtr();
-    stream->setTimeout(10000);
+    stream->setTimeout(kOtaStreamReadTimeoutMs);
 
-    static uint8_t buf[kOtaFlashChunkBytes];  // static: too big for the loop stack
     size_t   downloaded = 0;
     uint32_t lastToggle = millis();
     bool     pulseLedOn = true;
@@ -472,13 +472,13 @@ bool OtaManager::downloadAndFlash(const String& base, size_t firmwareSize, const
         size_t toRead    = firmwareSize - downloaded;
         if (toRead > kOtaFlashChunkBytes) toRead = kOtaFlashChunkBytes;
 
-        size_t bytesRead = stream->readBytes(buf, toRead);
+        size_t bytesRead = stream->readBytes(sChunkBuf, toRead);
         if (bytesRead == 0)
         {
             Scarfnet::log("[OTA] Stream read timeout at %u bytes", downloaded);
             break;
         }
-        if (Update.write(buf, bytesRead) != bytesRead)
+        if (Update.write(sChunkBuf, bytesRead) != bytesRead)
         {
             Scarfnet::log("[OTA] Update.write error at %u bytes", downloaded);
             break;
@@ -493,7 +493,8 @@ bool OtaManager::downloadAndFlash(const String& base, size_t firmwareSize, const
         }
 
         float    progress     = (float)downloaded / (float)firmwareSize;
-        uint32_t halfPeriodMs = (uint32_t)(1000.0f - 950.0f * progress);
+        uint32_t halfPeriodMs = kOtaProgressPulseStartHalfPeriodMs - (uint32_t)(progress *
+            (float)(kOtaProgressPulseStartHalfPeriodMs - kOtaProgressPulseEndHalfPeriodMs));
         uint32_t now          = millis();
         if (now - lastToggle >= halfPeriodMs)
         {
@@ -509,22 +510,18 @@ bool OtaManager::downloadAndFlash(const String& base, size_t firmwareSize, const
     {
         Scarfnet::log("[OTA] Download incomplete: got %u of %u bytes", downloaded, firmwareSize);
         Update.abort();
-        _ledSetter(CRGB::Black);
-        WiFi.disconnect();
-        return false;
+        return fail();
     }
 
     if (!Update.end())
     {
         Scarfnet::log("[OTA] Verification failed: %s", Update.errorString());
-        _ledSetter(CRGB::Black);
-        WiFi.disconnect();
-        return false;
+        return fail();
     }
 
     Scarfnet::log("[OTA] Update verified — restarting with v%d", serverVersion);
     _ledSetter(CRGB(0, 255, 0));
-    delay(2000);
+    delay(kOtaSuccessDisplayMs);
     ESP.restart();
     return true; // unreachable
 }
@@ -551,7 +548,7 @@ void OtaManager::autoUpdateTick(bool newerPeerSeen)
             Scarfnet::log("[OTA] Auto-update: server v%d found (own v%d) — restarting into receiver mode",
                           best, kScarfVersion);
             gAutoOtaRequest = kAutoOtaMagic;
-            delay(100);  // let the log flush
+            delay(kOtaRestartFlushMs);
             ESP.restart();
         }
         return;

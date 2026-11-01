@@ -3,7 +3,7 @@
 // Assembles the outgoing heartbeat from a scarf's state. Hardware-free so the
 // exact bytes a scarf relays are unit-tested natively.
 
-#include "config.h"           // kScarfVersion
+#include "config.h"
 #include "heartbeat_packet.h"
 #include "sync_state.h"
 #include "tempo_sync.h"

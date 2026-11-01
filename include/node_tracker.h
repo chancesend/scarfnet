@@ -8,7 +8,7 @@
 //   1. Call saw() on every received packet → get back whether this is a new node.
 //   2. Call checkTimeouts() every loop iteration → callbacks fire for stale peers.
 
-#include "mesh_types.h"  // NodeId
+#include "mesh_types.h"
 
 #include <functional>
 #include <unordered_map>

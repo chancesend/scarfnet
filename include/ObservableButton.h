@@ -36,8 +36,6 @@ public:
         eDown = 0,      // fires on the press edge (button physically goes down)
         ePress,         // fires on the release edge after a short press
         eLongPress,
-        eDoublePress,
-        eRelease,
         eExtraLongPress,
     };
 

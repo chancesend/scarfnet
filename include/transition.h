@@ -8,7 +8,7 @@
 // is unsigned: if the clock steps backward mid-fade, elapsed wraps to a huge
 // value and the fade completes immediately rather than stalling.
 
-#include "mesh_types.h"  // TimeMs
+#include "mesh_types.h"
 #include <stdint.h>
 
 namespace Scarfnet {

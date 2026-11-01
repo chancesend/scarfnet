@@ -35,9 +35,8 @@ std::unique_ptr<T> make_unique(Args&&... args)
     return std::unique_ptr<T>(new T(std::forward<Args>(args)...));
 }
 
-// Top-level coordinator. Wires together Mesh, ObservableButton, PatternManager,
-// and OtaManager. Call setup() once, then loop() or otaLoop() every iteration
-// depending on isInOtaMode().
+// Top-level coordinator: wires Mesh, button, patterns and OTA together. Call
+// setup() once, then loop() or otaLoop() every iteration per isInOtaMode().
 class Scarf
 {
 public:
@@ -47,8 +46,7 @@ public:
     void loop();
     void otaLoop();
 
-    bool           isInOtaMode()  const { return _otaManager && _otaManager->isActive(); }
-    Mesh::TimeMs   getTimeMsec()  const { return _timeMsec; }
+    bool isInOtaMode() const { return _otaManager && _otaManager->isActive(); }
 
 private:
     void showLEDs();
@@ -57,7 +55,8 @@ private:
     void processEvent(const ObservableButton::Event& event);
 
     void sendMessage();
-    void blinkNumNodes();
+    void scheduleRebroadcast();
+    Rnd  recordLocalPress();
     void onNodeJoined(Mesh::NodeId nodeId);
     void onNodeLeft(Mesh::NodeId nodeId);
     void onReceived(const HeartbeatPacket& pkt);
@@ -66,13 +65,10 @@ private:
     Mesh::TimeMs _timeMsec                  {0};
 
     ObservableButton _nextPatternButton;
-    bool             _onFlag        {false};
 
-    // Tap tempo plus its replicated version and tap-mode flag. See tempo_sync.h.
     TempoSync _tempo;
-    bool     _newerVersionSeen {false};  // true if any peer has a higher firmware version
-    // Triggered when a peer tells us to switch to a pattern we don't have;
-    // flashes the built-in LED red. Timed on local millis().
+    bool      _newerVersionSeen {false};
+    // Timed on local millis(), so a mesh clock jump can't cut it short.
     FlashBurst _unknownPatternAlarm {kUnknownPatternFlashCount, kUnknownPatternFlashHalfPeriodMs};
 
     NodeFlash _nodeFlashes[kMaxNodeFlashes] {};
@@ -81,24 +77,15 @@ private:
     Preferences _preferences;
 
     Task _taskSendMessage;
-    Task _blinkNoNodes;
     Task _taskLogMemory;
-    // Fires kBurstSyncCount times at kBurstSyncIntervalMs after a node joins,
-    // so the new peer converges pattern and clock quickly.
     Task _taskBurstSync;
-    // One-shot: re-broadcasts a freshly accepted update after a short random
-    // delay so the change floods epidemically instead of trickling. See
-    // kRebroadcastJitterMs.
     Task _taskRebroadcast;
 
-    // Replicated pattern-change state (changeIndex, last press, randomizer)
-    // carried in every heartbeat. See sync_state.h.
     SyncState _sync {};
 
     Leds _ledsReal;
     Leds _builtinLED;
-    // Pointer to the built-in LED's FastLED controller so we can re-show it at
-    // full brightness after FastLED.show() applies global power scaling.
+    // Kept to re-show the built-in LED after FastLED.show() power-scales it.
     CLEDController* _builtinLedController {nullptr};
 
     Scheduler _userScheduler;

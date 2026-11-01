@@ -5,3 +5,4 @@
 .DS_Store
 include/login.h
 logs/*
+tools/sim/scarfnet-sim

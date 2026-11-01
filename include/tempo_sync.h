@@ -20,7 +20,7 @@
 //     one taps — which bumps the index and takes over from the other.
 //   - Indices compare wrap-safely, so 65535 → 0 still counts as newer.
 
-#include "mesh_types.h"  // TimeMs
+#include "mesh_types.h"
 #include "tap_tempo.h"
 #include <stdint.h>
 
