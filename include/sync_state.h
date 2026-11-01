@@ -8,7 +8,6 @@
 // changeIndex, which no later heartbeat can correct.
 
 #include "heartbeat_packet.h"
-#include "sync.h"
 
 #include <string.h>
 
@@ -40,16 +39,22 @@ inline void writeSyncState(HeartbeatPacket& pkt, const SyncState& state)
 // presser id only decides a 1-in-65536 randomizer tie, and always does since
 // two colliding presses come from different pressers. Identical states are
 // not newer, so steady-state duplicates are still ignored.
+// True if change index `a` is newer than `b`, allowing for 32-bit wraparound.
+inline bool changeIndexNewer(ChangeIndex a, ChangeIndex b)
+{
+    return (int32_t)(a - b) > 0;
+}
+
 inline bool isNewerState(const SyncState& incoming, const SyncState& local)
 {
     if (incoming.changeIndex != local.changeIndex)
-        return shouldAcceptUpdate(incoming.changeIndex, local.changeIndex);
+        return changeIndexNewer(incoming.changeIndex, local.changeIndex);
     if (incoming.randomizer != local.randomizer)
         return incoming.randomizer > local.randomizer;
     return incoming.lastPressId > local.lastPressId;
 }
 
-// The sync state a packet carries, as sent (no rollover guard applied).
+// The sync state a packet carries.
 inline SyncState syncStateOf(const HeartbeatPacket& pkt)
 {
     return SyncState{pkt.changeIndex, pkt.lastPressMs, pkt.lastPressId, pkt.globalRandomizer};
@@ -76,8 +81,8 @@ inline UpdateDecision classifyUpdate(const HeartbeatPacket& pkt, const SyncState
 // Call only after classifyUpdate() returned Accept and the pattern was applied.
 inline void adoptSyncState(SyncState& state, const HeartbeatPacket& pkt)
 {
-    state.changeIndex = rolloverGuard(pkt.changeIndex);
-    state.lastPressMs = rolloverGuard(pkt.lastPressMs);
+    state.changeIndex = pkt.changeIndex;
+    state.lastPressMs = pkt.lastPressMs;
     state.lastPressId = pkt.lastPressId;
     state.randomizer  = pkt.globalRandomizer;
 }

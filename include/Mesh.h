@@ -11,11 +11,11 @@
 
 #include "config.h"
 #include "mesh_types.h"
-#include "sync.h"
 #include "clock_sync.h"
 #include "heartbeat_packet.h"
 #include "heartbeat_framer.h"
 #include "node_tracker.h"
+#include "rx_queue.h"
 #include "log.h"
 
 namespace Scarfnet {
@@ -27,11 +27,8 @@ namespace Scarfnet {
 // live in the hardware-free NodeTracker, ClockSync and HeartbeatFramer.
 class Mesh {
 public:
-    // Re-exported so Mesh::TimeMs / Mesh::NodeId / Mesh::ChangeIndex remain
-    // valid access paths for callers that already use those qualified names.
     using TimeMs      = Scarfnet::TimeMs;
     using NodeId      = Scarfnet::NodeId;
-    using ChangeIndex = Scarfnet::ChangeIndex;
 
     using ReceivedCb  = std::function<void(const HeartbeatPacket&)>;
     using NodeCb      = std::function<void(NodeId)>;
@@ -82,18 +79,19 @@ private:
     NodeCb     _joinedCb;
     NodeCb     _leftCb;
 
-    // Ring buffer: espNowRecvCb (WiFi task) writes; update() (loop task) reads.
-    static constexpr int kRxQueueSize = 16;
+    // espNowRecvCb (WiFi task) pushes; update() (loop task) pops.
+    struct PortMuxLock {
+        portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+        void lock()   { portENTER_CRITICAL(&mux); }
+        void unlock() { portEXIT_CRITICAL(&mux); }
+    };
     struct RxEntry {
         uint8_t mac[6];
         uint8_t data[HeartbeatFramer::kMaxWireLen];
         int     len;
     };
-    portMUX_TYPE _rxMux;
-    RxEntry      _rxQueue[kRxQueueSize];
-    int          _rxHead = 0;  // next write index (WiFi task)
-    int          _rxTail = 0;  // next read index  (loop task)
-    uint32_t     _rxDropped = 0;  // packets dropped on a full queue; logged by update()
+    static constexpr size_t kRxQueueSize = 16;
+    RxQueue<RxEntry, kRxQueueSize, PortMuxLock> _rxQueue;
 };
 
 } // namespace Scarfnet

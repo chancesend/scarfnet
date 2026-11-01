@@ -1,21 +1,17 @@
 #pragma once
 
 #include "defines.h"
-#include "sync.h"
-#include "sync_state.h"
+#include "sync_controller.h"
 #include "builtin_led.h"
 #include "Mesh.h"
 #include "ObservableButton.h"
 #include "OtaManager.h"
 #include "patterns.h"
 #include "PatternManager.h"
-#include "tap_tempo.h"
-#include "tempo_sync.h"
 
 #include <TaskScheduler.h>
 #include <Arduino.h>
 #include <FastLED.h>
-#include <M5Stack.h>
 #include <Preferences.h>
 
 #include <memory>
@@ -60,19 +56,15 @@ private:
     void onNodeJoined(Mesh::NodeId nodeId);
     void onNodeLeft(Mesh::NodeId nodeId);
     void onReceived(const HeartbeatPacket& pkt);
-    void debugModeUpdate(const HeartbeatPacket& pkt);
 
     Mesh::TimeMs _timeMsec                  {0};
 
     ObservableButton _nextPatternButton;
 
-    TempoSync _tempo;
-    bool      _newerVersionSeen {false};
     // Timed on local millis(), so a mesh clock jump can't cut it short.
     FlashBurst _unknownPatternAlarm {kUnknownPatternFlashCount, kUnknownPatternFlashHalfPeriodMs};
 
-    NodeFlash _nodeFlashes[kMaxNodeFlashes] {};
-    int       _nodeFlashCount {0};
+    NodeFlashTable _nodeFlashes;
 
     Preferences _preferences;
 
@@ -81,7 +73,7 @@ private:
     Task _taskBurstSync;
     Task _taskRebroadcast;
 
-    SyncState _sync {};
+    SyncController _sync;
 
     Leds _ledsReal;
     Leds _builtinLED;

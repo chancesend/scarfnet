@@ -3,7 +3,7 @@
 // Pure button state machine — no hardware, no Arduino, natively testable.
 //
 // ButtonReading holds one poll tick's worth of hardware button state. It is
-// produced by ObservableButton (from the hardware Button class) and consumed
+// produced by ButtonDebouncer (button_debouncer.h) and consumed
 // by ButtonStateMachine::update(). Keeping it as a plain struct lets native
 // tests inject controlled readings without any hardware dependency.
 //
@@ -19,9 +19,7 @@
 
 namespace Scarfnet {
 
-// One poll tick's button readings. The hardware-side producer (ObservableButton)
-// must call Button::read() before sampling these values. Tests construct this
-// directly with known values.
+// One poll tick's button readings. Tests construct this directly with known values.
 struct ButtonReading {
     bool wasJustPressed    = false;
     bool heldPastLong      = false;

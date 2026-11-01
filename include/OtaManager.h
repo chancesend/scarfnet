@@ -42,7 +42,7 @@ public:
     // Call every loop iteration in normal mode. While a peer on newer firmware
     // has been seen, periodically runs a non-blocking scan of the ESP-NOW
     // channel for an OTA server; if one is newer than us, restarts into
-    // receiver mode to update (giving up after kOtaAutoTimeoutMs).
+    // receiver mode to update. Backs off after failed attempts (ota_auto.h).
     void autoUpdateTick(bool newerPeerSeen);
 
     bool isActive() const { return _active; }
@@ -93,6 +93,7 @@ private:
 
     // Normal-mode auto-update scan state
     bool        _autoScanRunning {false};
+    bool        _backoffLogged   {false};
     uint32_t    _lastAutoScanMs  {0};
 };
 

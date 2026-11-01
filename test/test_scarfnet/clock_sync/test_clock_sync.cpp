@@ -241,6 +241,31 @@ void test_clock_sync_fresh_boot_converges_to_peer()
     TEST_ASSERT_TRUE(diff >= -15000 && diff <= 15000);
 }
 
+// Days of network uptime: offsets far past float's 1 ms resolution (2^24 ms)
+// must still track millisecond corrections.
+void test_clock_sync_tracks_small_corrections_at_large_offset()
+{
+    const uint32_t kNetworkMs = 260000000u;  // ~3 days
+    ClockSync cs;
+    for (int i = 0; i < kClockWarmupSamples; ++i) cs.update(kNetworkMs, 1000);
+    const int32_t base = (int32_t)(kNetworkMs - 1000u);
+    TEST_ASSERT_EQUAL_INT32(base, (int32_t)cs.offset);
+
+    for (int i = 0; i < 20; ++i) cs.update(kNetworkMs + 3u, 1000);  // peer now 3 ms ahead
+    TEST_ASSERT_INT32_WITHIN(1, base + 3, (int32_t)cs.offset);
+    TEST_ASSERT_INT32_WITHIN(1, (int32_t)(kNetworkMs + 3u + 60000u), (int32_t)cs.timeMs(61000));
+}
+
+void test_clock_sync_tracks_across_uint32_wrap()
+{
+    ClockSync cs;
+    for (int i = 0; i < kClockWarmupSamples; ++i) cs.update(0xFFFFFF00u, 1000);
+    cs.update(0xFFFFFF00u + 10u, 1000);  // 10 ms ahead → target moves 4 ms
+    // 0x200 ms later the network clock has wrapped past zero.
+    TEST_ASSERT_EQUAL_UINT32(0xFFFFFF00u + 0x200u + 4u, cs.timeMs(1000 + 0x200));
+    TEST_ASSERT_TRUE(cs.update(0x100u, 1000 + 0x200) == ClockSync::Action::Track);
+}
+
 // ---------------------------------------------------------------------------
 // Slewing: small corrections play out gradually; hard-sets apply at once
 // ---------------------------------------------------------------------------
@@ -337,6 +362,8 @@ void clock_sync_tests()
     RUN_TEST(test_clock_sync_two_warmed_domains_merge_on_ahead_clock);
     RUN_TEST(test_clock_sync_update_reports_action);
     RUN_TEST(test_clock_sync_sample_at_exact_deviation_limit_accepted);
+    RUN_TEST(test_clock_sync_tracks_small_corrections_at_large_offset);
+    RUN_TEST(test_clock_sync_tracks_across_uint32_wrap);
     RUN_TEST(test_clock_sync_handles_uint32_rollover);
     RUN_TEST(test_clock_sync_fresh_boot_converges_to_peer);
 }

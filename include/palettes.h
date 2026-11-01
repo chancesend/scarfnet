@@ -1,9 +1,6 @@
 #pragma once 
 
-#if SCARFNET_EMBEDDED
-//#define FASTLED_INTERNAL (1)
-#include <FastLED.h>
-#endif
+#include "defines.h"
 
 namespace Scarfnet
 {

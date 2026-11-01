@@ -91,8 +91,7 @@ struct SimScarf {
     PatternManager pm;
     Leds           leds;
     NodeId         nodeId;
-    NodeFlash      flashes[kMaxNodeFlashes];
-    int            flashCount    = 0;
+    NodeFlashTable flashes;
     uint32_t       nextHeartbeat = 0;  // wall-clock ms when this scarf next "broadcasts"
 
     explicit SimScarf(int idx)
@@ -101,21 +100,6 @@ struct SimScarf {
         // Stagger initial heartbeats so they don't all fire at once.
         , nextHeartbeat((uint32_t)(wallMs() + idx * 1200))
     {}
-
-    // Record a heartbeat arrival from `senderId`.
-    void receiveHeartbeat(NodeId senderId, uint32_t now) {
-        for (int i = 0; i < flashCount; i++) {
-            if (flashes[i].id == senderId) { flashes[i].when = now; return; }
-        }
-        if (flashCount < kMaxNodeFlashes) {
-            flashes[flashCount++] = {senderId, now};
-        } else {
-            int oldest = 0;
-            for (int i = 1; i < kMaxNodeFlashes; i++)
-                if (flashes[i].when < flashes[oldest].when) oldest = i;
-            flashes[oldest] = {senderId, now};
-        }
-    }
 };
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -219,7 +203,7 @@ int main()
                 sender->nextHeartbeat = now + kHeartbeatIntervalMs;
                 for (auto* receiver : scarves) {
                     if (receiver != sender)
-                        receiver->receiveHeartbeat(sender->nodeId, now);
+                        receiver->flashes.record(sender->nodeId, now);
                 }
             }
         }
@@ -228,8 +212,8 @@ int main()
             NodeInfo nodeInfo;
             nodeInfo.nodeId     = s->nodeId;
             nodeInfo.lastPressId = lastPressId;
-            nodeInfo.flashes    = s->flashes;
-            nodeInfo.flashCount = s->flashCount;
+            nodeInfo.flashes    = s->flashes.entries;
+            nodeInfo.flashCount = s->flashes.count;
             s->pm.runCurrentPattern(s->leds, now, beat, nodeInfo);
         }
 

@@ -128,6 +128,16 @@ void test_node_tracker_no_callback_called_when_no_timeout()
 
 // ---------------------------------------------------------------------------
 
+void test_node_tracker_count_in_leave_callback_excludes_departed()
+{
+    NodeTracker t;
+    t.saw(1, 0);
+    t.saw(2, 10000);
+    size_t countSeen = 99;
+    t.checkTimeouts(20000, 15000, [&](NodeId) { countSeen = t.count(); });
+    TEST_ASSERT_EQUAL(1, countSeen);
+}
+
 void node_tracker_tests()
 {
     RUN_TEST(test_node_tracker_new_node_returns_true);
@@ -142,4 +152,5 @@ void node_tracker_tests()
     RUN_TEST(test_node_tracker_heartbeat_refreshes_timeout);
     RUN_TEST(test_node_tracker_timeout_exactly_at_boundary);
     RUN_TEST(test_node_tracker_no_callback_called_when_no_timeout);
+    RUN_TEST(test_node_tracker_count_in_leave_callback_excludes_departed);
 }

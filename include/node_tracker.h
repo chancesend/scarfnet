@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <unordered_map>
+#include <vector>
 #include <cstdint>
 
 namespace Scarfnet {
@@ -27,20 +28,22 @@ struct NodeTracker {
         return isNew;
     }
 
-    // Erase peers whose last-seen time is more than `timeoutMs` ago.
-    // Calls `leaveCb` for each removed peer. Returns the number removed.
+    // Erase peers whose last-seen time is more than `timeoutMs` ago, then call
+    // `leaveCb` for each, so count() inside the callback excludes them.
+    // Returns the number removed.
     int checkTimeouts(TimeMs nowMs, TimeMs timeoutMs, const LeaveCb& leaveCb) {
-        int removed = 0;
+        std::vector<NodeId> gone;
         for (auto it = _peers.begin(); it != _peers.end(); ) {
             if (nowMs - it->second > timeoutMs) {
-                if (leaveCb) leaveCb(it->first);
+                gone.push_back(it->first);
                 it = _peers.erase(it);
-                ++removed;
             } else {
                 ++it;
             }
         }
-        return removed;
+        if (leaveCb)
+            for (NodeId id : gone) leaveCb(id);
+        return (int)gone.size();
     }
 
     // Number of currently-tracked peers (excludes self).

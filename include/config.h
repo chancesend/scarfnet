@@ -6,7 +6,7 @@
 // ── Scarf firmware version ───────────────────────────────────────────────────
 // Single source of truth for the firmware version. Increment before each OTA
 // flash. Stamped into heartbeat packets and the OTA SSID. 115 = v1.15.
-const uint16_t kScarfVersion              = 115;
+const uint16_t kScarfVersion              = 116;
 
 // ── Logging ──────────────────────────────────────────────────────────────────
 // Per-heartbeat send/receive/clock lines. Serial output blocks the loop once
@@ -117,7 +117,9 @@ const size_t   kOtaFlashChunkBytes        = 4096;  // one flash sector
 const uint32_t kOtaServeTimeoutMs         = 60000;
 // The server streams to one receiver at a time, so a receiver may wait for
 // another's download; waiting beats timing out and losing its turn.
-const uint32_t kOtaHttpTimeoutMs          = 30000;
+const uint32_t kOtaHttpTimeoutMs          = kOtaServeTimeoutMs + 5000;
+static_assert(kOtaHttpTimeoutMs > kOtaServeTimeoutMs, "a queued receiver must outwait one download");
+static_assert(kOtaHttpTimeoutMs <= UINT16_MAX, "HTTPClient::setTimeout takes uint16_t ms");
 const uint32_t kOtaStreamReadTimeoutMs    = 10000;
 
 // Receiver LED feedback.
@@ -140,3 +142,7 @@ const uint32_t kOtaRestartFlushMs         = 100;
 const uint32_t kOtaAutoScanIntervalMs     = 10000;
 const uint32_t kOtaAutoScanDwellMs        = 150;
 const uint32_t kOtaAutoTimeoutMs          = 120000;
+// Backoff after failed automatic attempts, measured from boot (see ota_auto.h).
+const uint32_t kOtaAutoBackoffBaseMs      = 30000;
+const uint32_t kOtaAutoBackoffStepMs      = 15000;
+const uint32_t kOtaAutoBackoffMaxMs       = 240000;

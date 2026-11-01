@@ -6,3 +6,4 @@
 include/login.h
 logs/*
 tools/sim/scarfnet-sim
+tools/sim/build/

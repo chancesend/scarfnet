@@ -11,6 +11,8 @@
 // at once.
 
 #include <stdint.h>
+#include <cmath>
+#include <cstdlib>
 
 #include "config.h"
 #include "mesh_types.h"
@@ -18,18 +20,18 @@
 namespace Scarfnet {
 
 struct ClockSync {
-    float offset  = 0.0f;  // target: millis() + (int32_t)offset == network time
-    int   samples = 0;     // heartbeats processed so far
+    TimeDiffMs offset  = 0;  // target: millis() + offset == network time
+    int        samples = 0;  // heartbeats processed so far
 
     enum class Action { Warmup, Track, JumpAhead, IgnoreBehind };
 
     // Feed one received peer timestamp. localMs is millis() when the packet
     // is processed. Returns what was done with the sample.
     Action update(TimeMs peerTimeMs, TimeMs localMs) {
-        int32_t rawDelta = (int32_t)peerTimeMs - (int32_t)localMs;
+        TimeDiffMs rawDelta = timeDiff(peerTimeMs, localMs);
 
         if (samples < kClockWarmupSamples) {
-            hardSet((float)rawDelta, localMs);
+            hardSet(rawDelta, localMs);
             ++samples;
             return Action::Warmup;
         }
@@ -41,37 +43,37 @@ struct ClockSync {
         // on the furthest-ahead clock with no voting. We stay warmed up after a
         // jump so a behind-domain peer heard next can't drag us back. Packets
         // are CRC-checked, so a corrupt far-future timestamp is not a concern.
-        float diff = (float)rawDelta - offset;
-        if (diff > (float)kClockMaxDeviationMs) {
-            hardSet((float)rawDelta, localMs);
+        TimeDiffMs diff = offsetDiff(rawDelta, offset);
+        if (diff > kClockMaxDeviationMs) {
+            hardSet(rawDelta, localMs);
             return Action::JumpAhead;
         }
-        if (diff < -(float)kClockMaxDeviationMs)
+        if (diff < -kClockMaxDeviationMs)
             return Action::IgnoreBehind;
 
         rebaseSlew(localMs);
-        offset = kClockEmaAlpha * (float)rawDelta + (1.0f - kClockEmaAlpha) * offset;
+        offset = offsetAdd(offset, (TimeDiffMs)lroundf(kClockEmaAlpha * (float)diff));
         return Action::Track;
     }
 
     // Offset actually applied at localMs: slewing from where it was at the last
     // update toward the target at kClockSlewRate ms per ms.
-    float displayedOffset(TimeMs localMs) const {
-        float gap     = offset - _slewFromOffset;
-        float maxStep = kClockSlewRate * (float)(localMs - _slewFromMs);
-        if (gap >  maxStep) return _slewFromOffset + maxStep;
-        if (gap < -maxStep) return _slewFromOffset - maxStep;
-        return offset;
+    TimeDiffMs displayedOffset(TimeMs localMs) const {
+        TimeDiffMs gap     = offsetDiff(offset, _slewFromOffset);
+        float      maxStep = kClockSlewRate * (float)(localMs - _slewFromMs);
+        if (maxStep >= (float)std::abs(gap)) return offset;
+        TimeDiffMs step = (TimeDiffMs)maxStep;  // floor: |step| < |gap|, so no overshoot
+        return offsetAdd(_slewFromOffset, gap > 0 ? step : -step);
     }
 
     TimeMs timeMs(TimeMs localMs) const {
-        return (TimeMs)((int32_t)localMs + (int32_t)displayedOffset(localMs));
+        return timeAdd(localMs, displayedOffset(localMs));
     }
 
     bool isWarmedUp() const { return samples >= kClockWarmupSamples; }
 
 private:
-    void hardSet(float newOffset, TimeMs localMs) {
+    void hardSet(TimeDiffMs newOffset, TimeMs localMs) {
         offset          = newOffset;
         _slewFromOffset = newOffset;
         _slewFromMs     = localMs;
@@ -83,8 +85,8 @@ private:
         _slewFromMs     = localMs;
     }
 
-    float  _slewFromOffset = 0.0f;
-    TimeMs _slewFromMs     = 0;
+    TimeDiffMs _slewFromOffset = 0;
+    TimeMs     _slewFromMs     = 0;
 };
 
 } // namespace Scarfnet

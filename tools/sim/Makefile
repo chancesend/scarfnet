@@ -3,14 +3,15 @@
 # Usage:
 #   make        — build
 #   make run    — build and run
-#   make clean  — remove build artifact
+#   make clean  — remove build artifacts
 
 CXX      := clang++
 CXXFLAGS := -std=c++17 -O2 \
              -Wno-deprecated-copy \
              -Wno-unused-variable \
              -Wno-unused-parameter \
-             -I../../include
+             -I../../include \
+             -MMD -MP
 
 SRC_ROOT := ../../src
 
@@ -19,19 +20,11 @@ SRCS := main.cpp \
         $(SRC_ROOT)/palettes.cpp \
         $(SRC_ROOT)/patterns.cpp \
         $(SRC_ROOT)/log.cpp \
-        $(SRC_ROOT)/patterns/breathe.cpp \
-        $(SRC_ROOT)/patterns/colorwaves.cpp \
-        $(SRC_ROOT)/patterns/confetti.cpp \
-        $(SRC_ROOT)/patterns/cylon.cpp \
-        $(SRC_ROOT)/patterns/dance.cpp \
-        $(SRC_ROOT)/patterns/firework.cpp \
-        $(SRC_ROOT)/patterns/fractal.cpp \
-        $(SRC_ROOT)/patterns/generative.cpp \
-        $(SRC_ROOT)/patterns/pride.cpp \
-        $(SRC_ROOT)/patterns/sparkle.cpp \
-        $(SRC_ROOT)/patterns/digital.cpp \
-        $(SRC_ROOT)/patterns/debug.cpp \
-        $(SRC_ROOT)/patterns/beat.cpp
+        $(wildcard $(SRC_ROOT)/patterns/*.cpp)
+
+BUILD := build
+OBJS  := $(patsubst %.cpp,$(BUILD)/%.o,$(notdir $(SRCS)))
+vpath %.cpp . $(SRC_ROOT) $(SRC_ROOT)/patterns
 
 TARGET := scarfnet-sim
 
@@ -39,11 +32,19 @@ TARGET := scarfnet-sim
 
 all: $(TARGET)
 
-$(TARGET): $(SRCS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $@ $(OBJS)
+
+$(BUILD)/%.o: %.cpp | $(BUILD)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+$(BUILD):
+	mkdir -p $@
 
 run: all
 	./$(TARGET)
 
 clean:
-	rm -f $(TARGET)
+	rm -rf $(TARGET) $(BUILD)
+
+-include $(OBJS:.o=.d)

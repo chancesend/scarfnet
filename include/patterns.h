@@ -2,6 +2,7 @@
 
 #include "defines.h"
 #include "mesh_types.h"
+#include "node_flash.h"
 #include "tap_tempo.h"
 
 #include <stdint.h>
@@ -9,13 +10,6 @@
 
 namespace Scarfnet
 {
-
-// Recent heartbeat arrival, used by the debug pattern for per-node flash effects.
-struct NodeFlash {
-    NodeId id;    // sender node ID
-    TimeMs when;  // mesh time the heartbeat was received
-};
-constexpr int kMaxNodeFlashes = 16;
 
 // All context a pattern needs to render one frame.
 struct PatternContext {

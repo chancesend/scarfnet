@@ -15,6 +15,7 @@
 #include <esp_attr.h>
 
 #include "ota_ssid.h"
+#include "ota_auto.h"
 
 namespace Scarfnet
 {
@@ -25,10 +26,15 @@ static const CRGB kServerColor   {160,   0, 160}; // purple
 static const char* const kOtaServerIp   = "192.168.4.1";
 static const uint16_t    kOtaHttpPort   = 80;
 
-// Survives a software restart (not a power cycle): set just before restarting
-// into auto-update mode, read and cleared by checkBootTrigger().
-static const uint32_t kAutoOtaMagic = 0x4155544Fu;  // "AUTO"
-RTC_NOINIT_ATTR static uint32_t gAutoOtaRequest;
+// Survives a software restart, not a power cycle. Power-on (or a new build
+// laying RTC memory out differently) leaves garbage, which the magic rejects.
+struct AutoOtaState {
+    uint32_t magic;
+    uint32_t requested;       // restart into receiver mode on the next boot
+    uint32_t failedAttempts;  // auto receiver sessions since the last update
+};
+static const uint32_t kAutoOtaStateMagic = 0x4155544Fu;  // "AUTO"
+RTC_NOINIT_ATTR static AutoOtaState gAutoOta;
 
 // Shared by firmware hashing, serving and downloading, which never overlap.
 // Static: too big for the loop stack.
@@ -67,10 +73,13 @@ bool OtaManager::fail()
 
 bool OtaManager::checkBootTrigger()
 {
-    if (gAutoOtaRequest == kAutoOtaMagic) {
-        gAutoOtaRequest = 0;  // one-shot: the next boot is normal
-        Scarfnet::log("[OTA] Auto-update requested — entering receiver mode (firmware v%d)",
-                      kScarfVersion);
+    if (gAutoOta.magic != kAutoOtaStateMagic)
+        gAutoOta = {kAutoOtaStateMagic, 0, 0};
+
+    if (gAutoOta.requested) {
+        gAutoOta.requested = 0;  // one-shot: the next boot is normal
+        Scarfnet::log("[OTA] Auto-update requested — entering receiver mode (firmware v%d, attempt %u)",
+                      kScarfVersion, (unsigned)gAutoOta.failedAttempts);
         _active      = true;
         _autoMode    = true;
         _autoStartMs = millis();
@@ -459,7 +468,7 @@ bool OtaManager::downloadAndFlash(const String& base, size_t firmwareSize, const
 
     // Manual chunk loop so the LED pulse can speed up with progress.
     WiFiClient* stream = http.getStreamPtr();
-    stream->setTimeout(kOtaStreamReadTimeoutMs);
+    stream->setTimeout(kOtaStreamReadTimeoutMs / 1000);  // WiFiClient takes seconds
 
     size_t   downloaded = 0;
     uint32_t lastToggle = millis();
@@ -520,6 +529,7 @@ bool OtaManager::downloadAndFlash(const String& base, size_t firmwareSize, const
     }
 
     Scarfnet::log("[OTA] Update verified — restarting with v%d", serverVersion);
+    gAutoOta.failedAttempts = 0;
     _ledSetter(CRGB(0, 255, 0));
     delay(kOtaSuccessDisplayMs);
     ESP.restart();
@@ -531,6 +541,15 @@ bool OtaManager::downloadAndFlash(const String& base, size_t firmwareSize, const
 void OtaManager::autoUpdateTick(bool newerPeerSeen)
 {
     if (!newerPeerSeen) return;
+    if (!autoOtaMayScan(newerPeerSeen, gAutoOta.failedAttempts, millis())) {
+        if (!_backoffLogged) {
+            Scarfnet::log("[OTA] Auto-update: %u failed attempt(s) — waiting until %us after boot",
+                          (unsigned)gAutoOta.failedAttempts,
+                          (unsigned)(autoOtaHoldoffMs(gAutoOta.failedAttempts) / 1000));
+            _backoffLogged = true;
+        }
+        return;
+    }
 
     if (_autoScanRunning) {
         int16_t found = WiFi.scanComplete();
@@ -547,7 +566,8 @@ void OtaManager::autoUpdateTick(bool newerPeerSeen)
         if (best > kScarfVersion) {
             Scarfnet::log("[OTA] Auto-update: server v%d found (own v%d) — restarting into receiver mode",
                           best, kScarfVersion);
-            gAutoOtaRequest = kAutoOtaMagic;
+            gAutoOta.requested = 1;
+            if (gAutoOta.failedAttempts < UINT32_MAX) ++gAutoOta.failedAttempts;  // cleared on success
             delay(kOtaRestartFlushMs);
             ESP.restart();
         }

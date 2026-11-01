@@ -5,7 +5,6 @@
 // its tests can compile natively.
 
 #include "mesh_types.h"
-#include "sync.h"
 
 #include <cstddef>
 #include <cstring>

@@ -8,20 +8,12 @@ namespace Scarfnet
 #if SCARFNET_EMBEDDED
 ObservableButton::ObservableButton(Scheduler* scheduler, uint8_t buttonPin)
     : _scheduler(scheduler),
-      _button(buttonPin, 1, kButtonDebounceMs),
       _pollFn([this]() -> ButtonReading {
-          // read() MUST be called first to latch the current pin state.
-          // It is baked into this lambda so it cannot be accidentally omitted.
-          _button.read();
-          return ButtonReading{
-              _button.wasPressed(),
-              _button.pressedFor(kLongPressMs),
-              _button.pressedFor(kExtraLongPressMs),
-              _button.wasReleased()
-          };
+          return _debouncer.sample(digitalRead(_buttonPin) == LOW, millis());
       }),
       _taskCheckButtonEvent(kButtonPollIntervalMs, TASK_FOREVER,
-                            [this]() { this->checkButtonEvent(); })
+                            [this]() { this->checkButtonEvent(); }),
+      _buttonPin(buttonPin)
 {
     Scarfnet::log("ObservableButton::ObservableButton()");
 }
@@ -39,6 +31,9 @@ ObservableButton::ObservableButton(Scheduler* scheduler, PollFn pollFn)
 
 void ObservableButton::setup()
 {
+#if SCARFNET_EMBEDDED
+    pinMode(_buttonPin, INPUT);
+#endif
     _scheduler->addTask(_taskCheckButtonEvent);
     _taskCheckButtonEvent.enable();
 }

@@ -38,12 +38,13 @@ void PatternManager::runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const Beat
     // Cross-fade: blend outgoing pattern into incoming over kPatternTransitionMs.
     uint8_t blendAmt;
     if (_patternFade.step(nodeTimeMs, blendAmt)) {
-        // Render outgoing pattern into a scratch buffer.
-        Leds prevLeds(leds.size(), CRGB::Black);
+        // Render outgoing pattern into a scratch buffer, cleared each frame.
+        // assign() reuses its capacity, so no allocation after the first fade.
+        _prevLeds.assign(leds.size(), CRGB::Black);
         PatternContext prevCtx  = ctx;
         prevCtx.rnd      = _previousRandomizer;
         prevCtx.localRnd = _previousLocalRnd;
-        _previousPattern->second(prevLeds, prevCtx);
+        _previousPattern->second(_prevLeds, prevCtx);
 
         // Render incoming pattern into leds.
         ctx.rnd      = _currentRandomizer;
@@ -52,7 +53,7 @@ void PatternManager::runCurrentPattern(Leds& leds, TimeMs nodeTimeMs, const Beat
 
         // Blend: 0 = all outgoing, 255 = all incoming.
         for (size_t i = 0; i < leds.size(); ++i)
-            leds[i] = blend(prevLeds[i], leds[i], blendAmt);
+            leds[i] = blend(_prevLeds[i], leds[i], blendAmt);
         return;
     }
 

@@ -1,10 +1,15 @@
 #include "defines.h"
 #include "palettes.h"
 
-#include <vector>
-
 namespace Scarfnet
 {
+
+// Built on demand from flash, so selecting a palette allocates nothing.
+struct NamedPalette {
+    const char*     name;
+    CRGBPalette16 (*make)();
+};
+#define PALETTE(name, source) { name, []() -> CRGBPalette16 { return source; } }
 
 #if SCARFNET_EMBEDDED
 
@@ -505,104 +510,77 @@ DEFINE_GRADIENT_PALETTE( Blue_Cyan_Yellow_gp ) {
   191,  42,255, 45,
   255, 255,255,  0}; 
 
-CRGBPalette16 getColorPalette(int8_t i)
-{
-  const std::vector<CRGBPalette16> palettes = {
-    CloudColors_p,
-    LavaColors_p,
-    OceanColors_p,
-    ForestColors_p,
-    RainbowColors_p,
-    RainbowStripeColors_p,
-    PartyColors_p,
-    HeatColors_p,
-    Sunset_Real_gp,
-    es_rivendell_15_gp,
-    es_ocean_breeze_036_gp,
-    rgi_15_gp,
-    retro2_16_gp,
-    Analogous_1_gp,
-    es_pinksplash_08_gp,
-    Coral_reef_gp,
-    es_ocean_breeze_068_gp,
-    es_pinksplash_07_gp,
-    es_vintage_01_gp,
-    departure_gp,
-    es_landscape_64_gp,
-    es_landscape_33_gp,
-    rainbowsherbet_gp,
-    gr65_hult_gp,
-    gr64_hult_gp,
-    GMT_drywet_gp,
-    ib_jul01_gp,
-    es_vintage_57_gp,
-    ib15_gp,
-    Fuschia_7_gp,
-    es_emerald_dragon_08_gp,
-    lava_gp,
-    fire_gp,
-    Colorfull_gp,
-    Magenta_Evening_gp,
-    Pink_Purple_gp,
-    es_autumn_19_gp,
-    BlacK_Blue_Magenta_White_gp,
-    BlacK_Magenta_Red_gp,
-    BlacK_Red_Magenta_Yellow_gp,
-    Blue_Cyan_Yellow_gp 
-  };
+// Each scarf picks its palette locally from the shared randomizer, so this
+// order is part of the protocol: reordering it changes what mixed-firmware
+// fleets show. Append only.
+static const NamedPalette kPalettes[] = {
+    PALETTE("Cloud", CloudColors_p),
+    PALETTE("Lava", LavaColors_p),
+    PALETTE("Ocean", OceanColors_p),
+    PALETTE("Forest", ForestColors_p),
+    PALETTE("Rainbow", RainbowColors_p),
+    PALETTE("RainbowStripe", RainbowStripeColors_p),
+    PALETTE("Party", PartyColors_p),
+    PALETTE("Heat", HeatColors_p),
+    PALETTE("Sunset_Real", Sunset_Real_gp),
+    PALETTE("es_rivendell_15", es_rivendell_15_gp),
+    PALETTE("es_ocean_breeze_036", es_ocean_breeze_036_gp),
+    PALETTE("rgi_15", rgi_15_gp),
+    PALETTE("retro2_16", retro2_16_gp),
+    PALETTE("Analogous_1", Analogous_1_gp),
+    PALETTE("es_pinksplash_08", es_pinksplash_08_gp),
+    PALETTE("Coral_reef", Coral_reef_gp),
+    PALETTE("es_ocean_breeze_068", es_ocean_breeze_068_gp),
+    PALETTE("es_pinksplash_07", es_pinksplash_07_gp),
+    PALETTE("es_vintage_01", es_vintage_01_gp),
+    PALETTE("departure", departure_gp),
+    PALETTE("es_landscape_64", es_landscape_64_gp),
+    PALETTE("es_landscape_33", es_landscape_33_gp),
+    PALETTE("rainbowsherbet", rainbowsherbet_gp),
+    PALETTE("gr65_hult", gr65_hult_gp),
+    PALETTE("gr64_hult", gr64_hult_gp),
+    PALETTE("GMT_drywet", GMT_drywet_gp),
+    PALETTE("ib_jul01", ib_jul01_gp),
+    PALETTE("es_vintage_57", es_vintage_57_gp),
+    PALETTE("ib15", ib15_gp),
+    PALETTE("Fuschia_7", Fuschia_7_gp),
+    PALETTE("es_emerald_dragon_08", es_emerald_dragon_08_gp),
+    PALETTE("lava", lava_gp),
+    PALETTE("fire", fire_gp),
+    PALETTE("Colorfull", Colorfull_gp),
+    PALETTE("Magenta_Evening", Magenta_Evening_gp),
+    PALETTE("Pink_Purple", Pink_Purple_gp),
+    PALETTE("es_autumn_19", es_autumn_19_gp),
+    PALETTE("BlacK_Blue_Magenta_White", BlacK_Blue_Magenta_White_gp),
+    PALETTE("BlacK_Magenta_Red", BlacK_Magenta_Red_gp),
+    PALETTE("BlacK_Red_Magenta_Yellow", BlacK_Red_Magenta_Yellow_gp),
+    PALETTE("Blue_Cyan_Yellow", Blue_Cyan_Yellow_gp),
+};
 
-  const auto palette = palettes[i % palettes.size()];
+#else // !SCARFNET_EMBEDDED — native build: the palettes fastled_stub.h provides
 
-  return palette;
-}
-
-const char* getPaletteName(int8_t i)
-{
-    static const char* const names[] = {
-        "Cloud", "Lava", "Ocean", "Forest",
-        "Rainbow", "RainbowStripe", "Party", "Heat",
-        "Sunset_Real", "es_rivendell_15", "es_ocean_breeze_036", "rgi_15",
-        "retro2_16", "Analogous_1", "es_pinksplash_08", "Coral_reef",
-        "es_ocean_breeze_068", "es_pinksplash_07", "es_vintage_01", "departure",
-        "es_landscape_64", "es_landscape_33", "rainbowsherbet", "gr65_hult",
-        "gr64_hult", "GMT_drywet", "ib_jul01", "es_vintage_57",
-        "ib15", "Fuschia_7", "es_emerald_dragon_08", "lava",
-        "fire", "Colorfull", "Magenta_Evening", "Pink_Purple",
-        "es_autumn_19", "BlacK_Blue_Magenta_White", "BlacK_Magenta_Red",
-        "BlacK_Red_Magenta_Yellow", "Blue_Cyan_Yellow",
-    };
-    static const int n = (int)(sizeof(names) / sizeof(names[0]));
-    return names[((unsigned)i) % n];
-}
-
-#else // !SCARFNET_EMBEDDED — native build: use the palettes from fastled_stub.h
-
-CRGBPalette16 getColorPalette(int8_t i)
-{
-    const CRGBPalette16 palettes[] = {
-        RainbowColors_p,
-        ForestColors_p,
-        CloudColors_p,
-        LavaColors_p,
-        OceanColors_p,
-        PartyColors_p,
-        HeatColors_p,
-        RainbowStripeColors_p,
-    };
-    const int n = (int)(sizeof(palettes) / sizeof(palettes[0]));
-    return palettes[((unsigned)i) % n];
-}
-
-const char* getPaletteName(int8_t i)
-{
-    static const char* const names[] = {
-        "Rainbow", "Forest", "Cloud", "Lava",
-        "Ocean", "Party", "Heat", "RainbowStripe",
-    };
-    static const int n = (int)(sizeof(names) / sizeof(names[0]));
-    return names[((unsigned)i) % n];
-}
+static const NamedPalette kPalettes[] = {
+    PALETTE("Rainbow",       RainbowColors_p),
+    PALETTE("Forest",        ForestColors_p),
+    PALETTE("Cloud",         CloudColors_p),
+    PALETTE("Lava",          LavaColors_p),
+    PALETTE("Ocean",         OceanColors_p),
+    PALETTE("Party",         PartyColors_p),
+    PALETTE("Heat",          HeatColors_p),
+    PALETTE("RainbowStripe", RainbowStripeColors_p),
+};
 
 #endif // SCARFNET_EMBEDDED
+
+static const NamedPalette& paletteFor(int8_t i)
+{
+    constexpr unsigned kCount = sizeof(kPalettes) / sizeof(kPalettes[0]);
+    return kPalettes[(unsigned)i % kCount];
+}
+
+CRGBPalette16 getColorPalette(int8_t i) { return paletteFor(i).make(); }
+const char*   getPaletteName(int8_t i)  { return paletteFor(i).name; }
+
+#undef PALETTE
 
 } // namespace Scarfnet

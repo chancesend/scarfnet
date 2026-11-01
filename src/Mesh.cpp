@@ -32,7 +32,6 @@ Mesh::TimeMs Mesh::timeMs() const {
 // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
 void Mesh::begin() {
-    portMUX_INITIALIZE(&_rxMux);
     gMeshInstance = this;
 
     uint8_t mac[6];
@@ -71,27 +70,13 @@ void Mesh::begin() {
 // ─── Loop ───────────────────────────────────────────────────────────────────
 
 void Mesh::update() {
-    // Drain the rx queue (filled by espNowRecvCb on the WiFi task).
-    while (true) {
-        RxEntry entry;
-        bool hasEntry = false;
-
-        portENTER_CRITICAL(&_rxMux);
-        if (_rxTail != _rxHead) {
-            entry   = _rxQueue[_rxTail];
-            _rxTail = (_rxTail + 1) % kRxQueueSize;
-            hasEntry = true;
-        }
-        portEXIT_CRITICAL(&_rxMux);
-
-        if (!hasEntry) break;
+    RxEntry entry;
+    while (_rxQueue.pop(entry))
         handleReceived(entry.mac, entry.data, entry.len);
-    }
 
-    portENTER_CRITICAL(&_rxMux);
-    uint32_t dropped = _rxDropped;
-    _rxDropped = 0;
-    portEXIT_CRITICAL(&_rxMux);
+    // Drops are counted in espNowRecvCb and logged here: Serial is unsafe
+    // inside its critical section.
+    uint32_t dropped = _rxQueue.takeDropped();
     if (dropped)
         Scarfnet::log("[MESH] rx queue full — %u packet(s) dropped", (unsigned)dropped);
 
@@ -107,21 +92,12 @@ void Mesh::update() {
     Mesh* self = gMeshInstance;
     if (!self) return;
 
-    portENTER_CRITICAL(&self->_rxMux);
-    int next = (self->_rxHead + 1) % kRxQueueSize;
-    if (next != self->_rxTail) {
-        RxEntry& slot = self->_rxQueue[self->_rxHead];
+    int copyLen = len < HeartbeatFramer::kMaxWireLen ? len : HeartbeatFramer::kMaxWireLen;
+    self->_rxQueue.push([&](RxEntry& slot) {
         memcpy(slot.mac,  mac,  6);
-        int copyLen = len < HeartbeatFramer::kMaxWireLen ? len : HeartbeatFramer::kMaxWireLen;
         memcpy(slot.data, data, copyLen);
-        slot.len      = copyLen;
-        self->_rxHead = next;
-    } else {
-        // Queue full; this packet is dropped. Counted here and logged from
-        // update() — logging (Serial) is unsafe inside this critical section.
-        ++self->_rxDropped;
-    }
-    portEXIT_CRITICAL(&self->_rxMux);
+        slot.len = copyLen;
+    });
 }
 
 // ─── Receive (loop task) ────────────────────────────────────────────────────
@@ -164,25 +140,25 @@ void Mesh::handleReceived(const uint8_t* mac, const uint8_t* data, int len) {
 
 void Mesh::updateClock(TimeMs pktCurrentTimeMs) {
     TimeMs  localMs  = millis();
-    int32_t rawDelta = (int32_t)pktCurrentTimeMs - (int32_t)localMs;
-    float   before   = _clock.offset;
+    TimeDiffMs rawDelta = timeDiff(pktCurrentTimeMs, localMs);
+    TimeDiffMs before   = _clock.offset;
 
     switch (_clock.update(pktCurrentTimeMs, localMs)) {
         case ClockSync::Action::Warmup:
             Scarfnet::log("[SYNC] warmup %d/%d offset=%dms",
-                          _clock.samples, kClockWarmupSamples, rawDelta);
+                          _clock.samples, kClockWarmupSamples, (int)rawDelta);
             break;
         case ClockSync::Action::JumpAhead:
-            Scarfnet::log("[SYNC] peer clock %.0fms ahead — jumping to it",
-                          (float)rawDelta - before);
+            Scarfnet::log("[SYNC] peer clock %dms ahead — jumping to it",
+                          (int)offsetDiff(rawDelta, before));
             break;
         case ClockSync::Action::IgnoreBehind:
-            Scarfnet::log("[SYNC] peer clock %.0fms behind — ignored (it will jump to ours)",
-                          before - (float)rawDelta);
+            Scarfnet::log("[SYNC] peer clock %dms behind — ignored (it will jump to ours)",
+                          (int)offsetDiff(before, rawDelta));
             break;
         case ClockSync::Action::Track:
             if (kVerboseLogging)
-                Scarfnet::log("[SYNC] offset=%.0fms raw=%dms", _clock.offset, rawDelta);
+                Scarfnet::log("[SYNC] offset=%dms raw=%dms", (int)_clock.offset, (int)rawDelta);
             break;
     }
 }

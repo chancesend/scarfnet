@@ -61,6 +61,7 @@ private:
     Rnd        _previousRandomizer {0};
     Rnd        _previousLocalRnd   {0};
     Transition _patternFade {kPatternTransitionMs};
+    Leds       _prevLeds;  // outgoing pattern's frame during the fade
 
     // Palette cross-fade: lerp from _prevPalette → _targetPalette over kPaletteTransitionMs.
     // Armed on boot so the palette fades in immediately.
